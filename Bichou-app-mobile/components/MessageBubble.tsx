@@ -1,0 +1,121 @@
+// components/MessageBubble.tsx
+import React from "react";
+import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { ChatMessage } from "../types/chat";
+import { useAppTheme } from "../hooks/useAppTheme";
+
+interface Props {
+  message: ChatMessage;
+  isOwnMessage: boolean;
+  onMediaPress?: (uri: string) => void;
+}
+
+function StatusIcon({ status, colors }: { status: ChatMessage["status"]; colors: ReturnType<typeof useAppTheme>["colors"] }) {
+  switch (status) {
+    case "sending":
+      return <Ionicons name="time-outline" size={13} color={colors.statusDefault} />;
+    case "sent":
+      return <Ionicons name="checkmark" size={14} color={colors.statusDefault} />;
+    case "delivered":
+      return <Ionicons name="checkmark-done" size={14} color={colors.statusDefault} />;
+    case "read":
+      return <Ionicons name="checkmark-done" size={14} color={colors.statusRead} />;
+    case "failed":
+      return <Ionicons name="alert-circle" size={14} color={colors.statusFailed} />;
+    default:
+      return null;
+  }
+}
+
+export default function MessageBubble({ message, isOwnMessage, onMediaPress }: Props) {
+  const { colors } = useAppTheme();
+
+  return (
+    <View style={[styles.container, isOwnMessage ? styles.containerRight : styles.containerLeft]}>
+      <View
+        style={[
+          styles.bubble,
+          { backgroundColor: isOwnMessage ? colors.bubbleOwn : colors.bubbleOther },
+          isOwnMessage ? styles.bubbleOwnShape : styles.bubbleOtherShape,
+        ]}
+      >
+        {message.media?.map((m) => (
+          <TouchableOpacity
+            key={m.id}
+            activeOpacity={0.85}
+            onPress={() => m.type === "image" && onMediaPress?.(m.uri)}
+          >
+            <Image source={{ uri: m.uri }} style={styles.media} resizeMode="cover" />
+          </TouchableOpacity>
+        ))}
+
+        {message.text ? (
+          <Text style={[styles.text, { color: isOwnMessage ? colors.textOwn : colors.textOther }]}>
+            {message.text}
+          </Text>
+        ) : null}
+
+        <View style={styles.footerRow}>
+          <Text style={[styles.time, { color: isOwnMessage ? "rgba(255,255,255,0.7)" : colors.textSecondary }]}>
+            {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          </Text>
+          {isOwnMessage && (
+            <View style={styles.statusIcon}>
+              <StatusIcon status={message.status} colors={colors} />
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    marginVertical: 4,
+    marginHorizontal: 10,
+    flexDirection: "row",
+  },
+  containerLeft: {
+    justifyContent: "flex-start",
+  },
+  containerRight: {
+    justifyContent: "flex-end",
+  },
+  bubble: {
+    maxWidth: "78%",
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  bubbleOwnShape: {
+    borderBottomRightRadius: 4,
+  },
+  bubbleOtherShape: {
+    borderBottomLeftRadius: 4,
+  },
+  text: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  media: {
+    width: 220,
+    height: 150,
+    borderRadius: 10,
+    marginBottom: 6,
+  },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    marginTop: 4,
+    gap: 4,
+  },
+  time: {
+    fontSize: 10,
+  },
+  statusIcon: {
+    marginLeft: 2,
+  },
+});

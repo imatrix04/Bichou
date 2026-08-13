@@ -1,56 +1,58 @@
-# Welcome to your Expo app 👋
+# CoupApp (Bichou)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Application mobile Android de communication privée entre Florent et Caro : chat temps réel, partage photo/vidéo, stockage commun, avec une architecture modulaire permettant d'ajouter facilement d'autres fonctionnalités (todo-list commune, calendrier partagé, tracker, etc.) au fil du temps.
 
-## Get started
+Usage strictement personnel, à deux utilisateurs (pas de scalabilité multi-tenant prévue pour la V1).
 
-1. Install dependencies
+## Structure du repo
 
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```
+Bichou/
+├── Bichou-app-mobile/        # Frontend mobile (Expo / React Native)
+│   ├── app/                  # Routes (expo-router)
+│   ├── components/           # Composants UI (ex: MessageBubble)
+│   ├── screens/               # Écrans (ex: ChatScreen)
+│   ├── data/                  # Données mock pour le dev
+│   ├── hooks/                  # Hooks (ex: useAppTheme)
+│   ├── theme/                  # Couleurs / thème
+│   ├── types/                  # Types partagés
+│   └── utils/                  # Utilitaires (ex: mediaPicker)
+├── contexte-projet-couplapp.md  # Note de cadrage du projet
+└── backend/                    # (à venir) API FastAPI
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Stack technique
 
-### Other setup steps
+**Backend** *(à venir)*
+- FastAPI (Python)
+- WebSockets natifs FastAPI pour le chat temps réel
+- PostgreSQL comme base relationnelle principale
+- Stockage médias : bucket S3-compatible (Minio self-hosted ou Cloudflare R2 / Backblaze B2)
+- Auth JWT simple, 2 comptes utilisateurs fixes
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+**Frontend mobile (Android)**
+- Expo / React Native
+- Cible Android uniquement pour la V1, portabilité iOS non exclue plus tard
 
-## Learn more
+**Modélisation**
+- Méthodologie Merise (MCD/MLD) pour la conception de la base de données
+- Format de travail : Mermaid erDiagram
 
-To learn more about developing your project with Expo, look at the following resources:
+## Architecture modulaire
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+Une table `modules` en base : chaque fonctionnalité (chat, galerie, stockage, todo, etc.) est pensée comme un module isolé avec ses propres routes API et son propre schéma de données, pour pouvoir ajouter un nouveau module sans casser l'existant. Le chat + partage médias + stockage commun constituent le socle du module "core" de la V1.
 
-## Join the community
+## Roadmap
 
-Join our community of developers creating universal apps.
+1. **V1** : chat (texte + photo/vidéo), stockage commun basique, auth 2 utilisateurs
+2. **V2+** : modules additionnels (à définir au fil des besoins du quotidien)
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## Démarrer le frontend
+
+```bash
+cd Bichou-app-mobile
+npm install
+npx expo start
+```
+
+Voir [contexte-projet-couplapp.md](contexte-projet-couplapp.md) pour le détail du cadrage et des contraintes du projet.
