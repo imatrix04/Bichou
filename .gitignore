@@ -3,6 +3,9 @@
 # dependencies
 node_modules/
 
+dist
+.env
+
 # Expo
 .expo/
 dist/
@@ -37,6 +40,8 @@ yarn-error.*
 *.tsbuildinfo
 
 example
+
+contexte-projet-couplapp.md
 
 # generated native folders
 /ios

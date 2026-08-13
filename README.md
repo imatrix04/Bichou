@@ -19,7 +19,7 @@ Bichou/
 │   └── utils/                  # Utilitaires (ex: mediaPicker)
 ├── contexte-projet-couplapp.md  # Note de cadrage du projet
 └── backend/                    # (à venir) API FastAPI
-```
+``` 
 
 ## Stack technique
 
@@ -45,7 +45,7 @@ Une table `modules` en base : chaque fonctionnalité (chat, galerie, stockage, t
 ## Roadmap
 
 1. **V1** : chat (texte + photo/vidéo), stockage commun basique, auth 2 utilisateurs
-2. **V2+** : modules additionnels (à définir au fil des besoins du quotidien)
+2. **V1+** : modules additionnels (à définir au fil des besoins du quotidien)
 
 ## Démarrer le frontend
 
