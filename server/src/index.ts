@@ -5,9 +5,13 @@ import { Server } from "socket.io";
 import { config } from "./config.js";
 import { pool } from "./db.js";
 
+import { routeurAuth } from "./routes/auth.js";
+
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.use("/auth", routeurAuth);
 
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
@@ -19,7 +23,8 @@ app.get("/health", async (_req, res) => {
     const result = await pool.query("SELECT NOW() AS maintenant");
     res.json({ ok: true, db: result.rows[0].maintenant });
   } catch (err) {
-    res.status(500).json({ ok: false, erreur: "Base injoignable" });
+    console.error("Erreur DB :", err);
+    res.status(500).json({ ok: false, erreur: String(err) });
   }
 });
 

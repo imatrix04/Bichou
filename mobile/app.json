@@ -35,10 +35,13 @@
         }
       ],
       [
-      "expo-image-picker", 
-      { "photosPermission": "Bichou a besoin d'accéder à tes photos pour les partager dans le chat.",
-        "cameraPermission": "Bichou a besoin de la caméra pour prendre une photo à partager." }
-      ]
+        "expo-image-picker",
+        {
+          "photosPermission": "Bichou a besoin d'accéder à tes photos pour les partager dans le chat.",
+          "cameraPermission": "Bichou a besoin de la caméra pour prendre une photo à partager."
+        }
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true,
