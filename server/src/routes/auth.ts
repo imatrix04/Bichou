@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { query } from "../db.js";
+import { query, transaction } from "../db.js";
 import { hasherMotDePasse, verifierMotDePasse } from "../auth/password.js";
 import { genererToken } from "../auth/jwt.js";
 import { authRequise } from "../auth/middleware.js";
@@ -40,12 +40,43 @@ routeurAuth.post("/register", async (req, res) => {
 
     const hash = await hasherMotDePasse(motDePasse);
 
-    const [utilisateur] = await query<LigneUtilisateur>(
-      `INSERT INTO utilisateur (login, mot_de_passe_hash, nom_affiche)
-       VALUES ($1, $2, $3)
-       RETURNING id, login, nom_affiche, avatar_url`,
-      [login.trim().toLowerCase(), hash, nomAffiche.trim()]
-    );
+    const utilisateur = await transaction(async (client) => {
+      const { rows } = await client.query<LigneUtilisateur>(
+        `INSERT INTO utilisateur (login, mot_de_passe_hash, nom_affiche)
+         VALUES ($1, $2, $3)
+         RETURNING id, login, nom_affiche, avatar_url`,
+        [login.trim().toLowerCase(), hash, nomAffiche.trim()]
+      );
+
+      const nouveau = rows[0];
+
+      // S'assure qu'une conversation existe (le premier inscrit la crée)
+      const { rows: conversations } = await client.query<{ id: string }>(
+        `SELECT id FROM conversation ORDER BY cree_le LIMIT 1`
+      );
+
+      let conversationId: string;
+
+      if (conversations.length === 0) {
+        const { rows: creee } = await client.query<{ id: string }>(
+          `INSERT INTO conversation (titre) VALUES ($1) RETURNING id`,
+          ["Nous deux"]
+        );
+        conversationId = creee[0].id;
+      } else {
+        conversationId = conversations[0].id;
+      }
+
+      // Rattache le nouvel utilisateur à cette conversation
+      await client.query(
+        `INSERT INTO participation (utilisateur_id, conversation_id)
+         VALUES ($1, $2)
+         ON CONFLICT DO NOTHING`,
+        [nouveau.id, conversationId]
+      );
+
+      return nouveau;
+    });
 
     const token = genererToken({
       utilisateurId: utilisateur.id,

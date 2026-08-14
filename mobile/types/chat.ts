@@ -1,7 +1,4 @@
-// types/chat.ts
-// Types alignés sur les futures entités du MCD (Utilisateur, Message, Média, Conversation)
-
-export type UserId = "florent" | "caro";
+export type UserId = string;
 
 export interface User {
   id: UserId;

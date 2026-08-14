@@ -1,3 +1,5 @@
+import type { ChatMessage } from "../types/chat";
+
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
 if (!BASE_URL) {
@@ -16,6 +18,12 @@ export interface UtilisateurApi {
 interface ReponseAuth {
   token: string;
   utilisateur: UtilisateurApi;
+}
+
+export interface ConversationApi {
+  id: string;
+  titre: string | null;
+  cree_le: string;
 }
 
 export class ApiError extends Error {
@@ -66,4 +74,37 @@ export async function recupererProfil(token: string): Promise<UtilisateurApi> {
   }
 
   return reponse.json();
+}
+
+export async function recupererConversations(token: string): Promise<ConversationApi[]> {
+  const reponse = await fetch(`${BASE_URL}/messages/conversations/mes`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!reponse.ok) {
+    throw new ApiError("Impossible de charger les conversations", reponse.status);
+  }
+
+  const donnees = await reponse.json();
+  return donnees.conversations;
+}
+
+export async function recupererMessages(
+  token: string,
+  conversationId: string,
+  avant?: string
+): Promise<ChatMessage[]> {
+  const url = new URL(`${BASE_URL}/messages/${conversationId}`);
+  if (avant) url.searchParams.set("avant", avant);
+
+  const reponse = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!reponse.ok) {
+    throw new ApiError("Impossible de charger les messages", reponse.status);
+  }
+
+  const donnees = await reponse.json();
+  return donnees.messages;
 }

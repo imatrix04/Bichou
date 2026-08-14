@@ -1,5 +1,5 @@
 // screens/ChatScreen.tsx
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   FlatList,
@@ -11,26 +11,32 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
+import { useAuth } from "../contexts/AuthContext";
+import { useChat } from "../hooks/useChat";
+import { useAppTheme } from "../hooks/useAppTheme";
 import MessageBubble from "../components/MessageBubble";
-import { mockMessages, users, CURRENT_USER_ID } from "../data/mockMessage";
 import { ChatMessage, MediaAttachment } from "../types/chat";
 import { pickFromCamera, pickFromLibrary } from "../utils/mediaPicker";
-import { useAppTheme } from "../hooks/useAppTheme";
 
 export default function ChatScreen() {
   const { colors } = useAppTheme();
-  const [messages, setMessages] = useState<ChatMessage[]>(mockMessages);
+  const { utilisateur, seDeconnecter } = useAuth();
+  const { messages, chargement, connecte, envoyerMessage, marquerCommeLus } = useChat();
+
   const [draft, setDraft] = useState("");
   const [pendingMedia, setPendingMedia] = useState<MediaAttachment | null>(null);
   const [viewerMedia, setViewerMedia] = useState<{ uri: string; width?: number; height?: number } | null>(null);
   const [showAttachOptions, setShowAttachOptions] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
-  const otherUser = Object.values(users).find((u) => u.id !== CURRENT_USER_ID);
+  useEffect(() => {
+    if (!chargement) marquerCommeLus();
+  }, [chargement, messages.length, marquerCommeLus]);
 
   const toggleAttachOptions = useCallback(() => {
     setShowAttachOptions((prev) => !prev);
@@ -50,40 +56,28 @@ export default function ChatScreen() {
 
   const handleSend = useCallback(() => {
     const trimmedText = draft.trim();
-    if (!trimmedText && !pendingMedia) return;
+    if (!trimmedText) return;
 
-    const newMessage: ChatMessage = {
-      id: `local-${Date.now()}`,
-      conversationId: "conv-main",
-      senderId: CURRENT_USER_ID,
-      text: trimmedText || undefined,
-      media: pendingMedia ? [pendingMedia] : undefined,
-      createdAt: new Date().toISOString(),
-      status: "sending",
-    };
-
-    // En mock : on ajoute direct en local.
-    // Plus tard : optimistic update + envoi via le WebSocket FastAPI
-    // (le fichier média sera uploadé vers le bucket S3/Minio avant ou après
-    // l'envoi du message, selon la stratégie choisie côté back), puis mise
-    // à jour du status ("sent" / "delivered" / "failed").
-    setMessages((prev) => [...prev, newMessage]);
+    envoyerMessage(trimmedText);
     setDraft("");
     setPendingMedia(null);
 
     requestAnimationFrame(() => {
       listRef.current?.scrollToEnd({ animated: true });
     });
-  }, [draft, pendingMedia]);
+  }, [draft, envoyerMessage]);
 
-  const canSend = draft.trim().length > 0 || pendingMedia !== null;
+  const canSend = draft.trim().length > 0;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { borderBottomColor: colors.headerBorder }]}>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {otherUser?.displayName ?? "Chat"}
+          Bichou{connecte ? "" : " (hors ligne)"}
         </Text>
+        <TouchableOpacity onPress={seDeconnecter}>
+          <Ionicons name="log-out-outline" size={22} color={colors.accent} />
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
@@ -91,25 +85,31 @@ export default function ChatScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
       >
-        <FlatList
-          ref={listRef}
-          data={messages}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <MessageBubble
-              message={item}
-              isOwnMessage={item.senderId === CURRENT_USER_ID}
-              onMediaPress={(uri) => {
-                const media = item.media?.find((m) => m.uri === uri);
-                setViewerMedia({ uri, width: media?.width, height: media?.height });
-              }}
-            />
-          )}
-          contentContainerStyle={styles.listContent}
-          onContentSizeChange={() =>
-            listRef.current?.scrollToEnd({ animated: false })
-          }
-        />
+        {chargement ? (
+          <View style={styles.centre}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <MessageBubble
+                message={item}
+                isOwnMessage={item.senderId === utilisateur?.id}
+                onMediaPress={(uri) => {
+                  const media = item.media?.find((m) => m.uri === uri);
+                  setViewerMedia({ uri, width: media?.width, height: media?.height });
+                }}
+              />
+            )}
+            contentContainerStyle={styles.listContent}
+            onContentSizeChange={() =>
+              listRef.current?.scrollToEnd({ animated: false })
+            }
+          />
+        )}
 
         {showAttachOptions && (
           <View style={styles.attachOptionsRow}>
@@ -162,6 +162,8 @@ export default function ChatScreen() {
             onChangeText={setDraft}
             multiline
             blurOnSubmit={false}
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
           />
           <TouchableOpacity
             style={[styles.sendButton, { backgroundColor: canSend ? colors.accent : colors.accentMuted }]}
@@ -216,7 +218,15 @@ const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  centre: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
