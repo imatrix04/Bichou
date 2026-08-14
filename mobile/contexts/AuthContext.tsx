@@ -1,12 +1,12 @@
 // contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
-import * as SecureStore from "expo-secure-store";
 import {
   connexion as apiConnexion,
   inscription as apiInscription,
   recupererProfil,
   type UtilisateurApi,
 } from "../services/api";
+import { lire, ecrire, supprimer } from "../utils/stockageSecurise";
 
 const CLE_TOKEN = "bichou_token";
 
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const tokenStocke = await SecureStore.getItemAsync(CLE_TOKEN);
+        const tokenStocke = await lire(CLE_TOKEN);
         if (!tokenStocke) return;
 
         const profil = await recupererProfil(tokenStocke);
@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUtilisateur(profil);
       } catch {
         // Token expiré ou serveur injoignable : on repart sur l'écran de connexion
-        await SecureStore.deleteItemAsync(CLE_TOKEN);
+        await supprimer(CLE_TOKEN);
       } finally {
         setChargement(false);
       }
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const seConnecter = useCallback(async (login: string, motDePasse: string) => {
     const { token: nouveauToken, utilisateur: profil } = await apiConnexion(login, motDePasse);
-    await SecureStore.setItemAsync(CLE_TOKEN, nouveauToken);
+    await ecrire(CLE_TOKEN, nouveauToken);
     setToken(nouveauToken);
     setUtilisateur(profil);
   }, []);
@@ -59,7 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         motDePasse,
         nomAffiche
       );
-      await SecureStore.setItemAsync(CLE_TOKEN, nouveauToken);
+      await ecrire(CLE_TOKEN, nouveauToken);
       setToken(nouveauToken);
       setUtilisateur(profil);
     },
@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const seDeconnecter = useCallback(async () => {
-    await SecureStore.deleteItemAsync(CLE_TOKEN);
+    await supprimer(CLE_TOKEN);
     setToken(null);
     setUtilisateur(null);
   }, []);

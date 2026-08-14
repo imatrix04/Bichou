@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { connecterSocket, deconnecterSocket } from "../services/socket";
-import { recupererConversations, recupererMessages } from "../services/api";
-import type { ChatMessage } from "../types/chat";
+import { recupererConversations, recupererMessages, televerserMedia } from "../services/api";
+import type { ChatMessage, MediaAttachment } from "../types/chat";
 
 export function useChat() {
   const { token, utilisateur } = useAuth();
@@ -75,39 +75,71 @@ export function useChat() {
     };
   }, [token]);
 
-  const envoyerMessage = useCallback(
-    (contenu: string) => {
+    const envoyerMessage = useCallback(
+    async (contenu: string, media?: MediaAttachment) => {
       const socket = socketRef.current;
-      if (!socket || !conversationId || !utilisateur) return;
+      if (!socket || !conversationId || !utilisateur || !token) return;
 
       const idLocal = `local-${Date.now()}`;
 
-      // Affichage optimiste : le message apparaît immédiatement
       const optimiste: ChatMessage = {
         id: idLocal,
         conversationId,
         senderId: utilisateur.id,
-        text: contenu,
+        text: contenu || undefined,
+        media: media ? [media] : undefined,
         createdAt: new Date().toISOString(),
         status: "sending",
       };
 
       setMessages((prev) => [...prev, optimiste]);
 
-      socket.emit("message:envoyer", { conversationId, contenu, idLocal }, (reponse: any) => {
-        if (reponse?.ok) {
-          // Remplace le message local par la version serveur
-          setMessages((prev) =>
-            prev.map((m) => (m.id === idLocal ? reponse.message : m))
+      try {
+        let mediasPayload: unknown[] = [];
+
+        if (media?.uri) {
+          const televerse = await televerserMedia(
+            token,
+            media.uri,
+            media.mimeType ?? "image/jpeg"
           );
-        } else {
-          setMessages((prev) =>
-            prev.map((m) => (m.id === idLocal ? { ...m, status: "failed" } : m))
-          );
+
+          mediasPayload = [
+            {
+              type: media.type,
+              cleObjet: televerse.cleObjet,
+              mimeType: televerse.mimeType,
+              tailleOctets: televerse.tailleOctets,
+              width: media.width,
+              height: media.height,
+              durationMs: media.durationMs,
+            },
+          ];
         }
-      });
+
+        socket.emit(
+          "message:envoyer",
+          { conversationId, contenu, medias: mediasPayload, idLocal },
+          (reponse: any) => {
+            if (reponse?.ok) {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === idLocal ? reponse.message : m))
+              );
+            } else {
+              setMessages((prev) =>
+                prev.map((m) => (m.id === idLocal ? { ...m, status: "failed" } : m))
+              );
+            }
+          }
+        );
+      } catch (err) {
+        console.error("Erreur envoi média :", err);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === idLocal ? { ...m, status: "failed" } : m))
+        );
+      }
     },
-    [conversationId, utilisateur]
+    [conversationId, utilisateur, token]
   );
 
   // Marque comme lus les messages reçus non lus

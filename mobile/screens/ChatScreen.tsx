@@ -22,6 +22,7 @@ import { useAppTheme } from "../hooks/useAppTheme";
 import MessageBubble from "../components/MessageBubble";
 import { ChatMessage, MediaAttachment } from "../types/chat";
 import { pickFromCamera, pickFromLibrary } from "../utils/mediaPicker";
+import { urlComplete } from "../services/api";
 
 export default function ChatScreen() {
   const { colors } = useAppTheme();
@@ -56,18 +57,18 @@ export default function ChatScreen() {
 
   const handleSend = useCallback(() => {
     const trimmedText = draft.trim();
-    if (!trimmedText) return;
+    if (!trimmedText && !pendingMedia) return;
 
-    envoyerMessage(trimmedText);
+    envoyerMessage(trimmedText, pendingMedia ?? undefined);
     setDraft("");
     setPendingMedia(null);
 
     requestAnimationFrame(() => {
       listRef.current?.scrollToEnd({ animated: true });
     });
-  }, [draft, envoyerMessage]);
+  }, [draft, pendingMedia, envoyerMessage]);
 
-  const canSend = draft.trim().length > 0;
+  const canSend = draft.trim().length > 0 || pendingMedia !== null;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -99,7 +100,9 @@ export default function ChatScreen() {
                 message={item}
                 isOwnMessage={item.senderId === utilisateur?.id}
                 onMediaPress={(uri) => {
-                  const media = item.media?.find((m) => m.uri === uri);
+                  const media = item.media?.find(
+                    (m) => (m.url ? urlComplete(m.url) : m.uri) === uri
+                  );
                   setViewerMedia({ uri, width: media?.width, height: media?.height });
                 }}
               />

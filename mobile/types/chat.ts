@@ -13,11 +13,14 @@ export type MediaType = "image" | "video";
 export interface MediaAttachment {
   id: string;
   type: MediaType;
-  uri: string; // local uri en mock, url S3/Minio plus tard
-  thumbnailUri?: string;
+  /** URL signée fournie par le serveur (média déjà envoyé) */
+  url?: string;
+  /** URI locale sur le téléphone (média pas encore envoyé) */
+  uri?: string;
+  mimeType?: string;
   width?: number;
   height?: number;
-  durationMs?: number; // pour les vidéos
+  durationMs?: number;
 }
 
 export interface ChatMessage {

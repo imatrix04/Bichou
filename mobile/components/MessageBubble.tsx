@@ -5,6 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { ChatMessage } from "../types/chat";
 import { useAppTheme } from "../hooks/useAppTheme";
 
+import { urlComplete } from "../services/api";
+
 interface Props {
   message: ChatMessage;
   isOwnMessage: boolean;
@@ -40,15 +42,20 @@ export default function MessageBubble({ message, isOwnMessage, onMediaPress }: P
           isOwnMessage ? styles.bubbleOwnShape : styles.bubbleOtherShape,
         ]}
       >
-        {message.media?.map((m) => (
-          <TouchableOpacity
-            key={m.id}
-            activeOpacity={0.85}
-            onPress={() => m.type === "image" && onMediaPress?.(m.uri)}
-          >
-            <Image source={{ uri: m.uri }} style={styles.media} resizeMode="cover" />
-          </TouchableOpacity>
-        ))}
+        {message.media?.map((m) => {
+          const source = m.url ? urlComplete(m.url) : m.uri;
+          if (!source) return null;
+
+          return (
+            <TouchableOpacity
+              key={m.id}
+              activeOpacity={0.85}
+              onPress={() => m.type === "image" && onMediaPress?.(source)}
+            >
+              <Image source={{ uri: source }} style={styles.media} resizeMode="cover" />
+            </TouchableOpacity>
+          );
+        })}
 
         {message.text ? (
           <Text style={[styles.text, { color: isOwnMessage ? colors.textOwn : colors.textOther }]}>

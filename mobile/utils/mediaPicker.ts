@@ -8,6 +8,7 @@ function toMediaAttachment(asset: ImagePicker.ImagePickerAsset): MediaAttachment
     id: `${Date.now()}-${Math.round(Math.random() * 1e6)}`,
     type,
     uri: asset.uri,
+    mimeType: asset.mimeType ?? (type === "video" ? "video/mp4" : "image/jpeg"),
     width: asset.width,
     height: asset.height,
     durationMs: asset.duration ?? undefined,

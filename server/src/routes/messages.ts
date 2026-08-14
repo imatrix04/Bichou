@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { query, transaction } from "../db.js";
 import { authRequise } from "../auth/middleware.js";
+import { urlSignee } from "../stockage/url.js";
 
 export const routeurMessages = Router();
 
@@ -32,12 +33,24 @@ function versMessageApi(ligne: LigneMessage, utilisateurCourantId: string) {
     statut = "sent";
   }
 
+  const medias = Array.isArray(ligne.medias) && ligne.medias.length > 0
+    ? (ligne.medias as any[]).map((m) => ({
+        id: m.id,
+        type: m.type,
+        url: urlSignee(m.cleObjet),
+        mimeType: m.mimeType,
+        width: m.width,
+        height: m.height,
+        durationMs: m.durationMs,
+      }))
+    : undefined;
+
   return {
     id: ligne.id,
     conversationId: ligne.conversation_id,
     senderId: ligne.expediteur_id,
     text: ligne.contenu ?? undefined,
-    media: Array.isArray(ligne.medias) && ligne.medias.length > 0 ? ligne.medias : undefined,
+    media: medias,
     createdAt: ligne.envoye_le.toISOString(),
     status: statut,
     supprime: ligne.supprime,

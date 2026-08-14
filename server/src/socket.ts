@@ -1,10 +1,22 @@
 import type { Server, Socket } from "socket.io";
 import { verifierToken, type PayloadToken } from "./auth/jwt.js";
 import { query, transaction } from "./db.js";
+import { urlSignee } from "./stockage/url.js";
 
 interface SocketAuthentifie extends Socket {
   utilisateur?: PayloadToken;
 }
+
+interface LigneMediaCreee {
+  id: string;
+  type: string;
+  cle_objet: string;
+  mime_type: string;
+  largeur: number | null;
+  hauteur: number | null;
+  duree_ms: number | null;
+}
+
 
 export function configurerSocket(io: Server) {
   // Middleware d'authentification : rejette toute connexion sans token valide
@@ -54,12 +66,15 @@ export function configurerSocket(io: Server) {
       console.error("Erreur marquage remis :", err);
     }
 
-    // Envoi d'un message
+    // Envoi d'un message (texte et/ou médias)
     socket.on("message:envoyer", async (donnees, callback) => {
-      const { conversationId, contenu, idLocal } = donnees ?? {};
+      const { conversationId, contenu, medias, idLocal } = donnees ?? {};
 
-      if (typeof conversationId !== "string" || typeof contenu !== "string" || !contenu.trim()) {
-        return callback?.({ ok: false, erreur: "Données invalides" });
+      const texte = typeof contenu === "string" ? contenu.trim() : "";
+      const listeMedias = Array.isArray(medias) ? medias : [];
+
+      if (typeof conversationId !== "string" || (!texte && listeMedias.length === 0)) {
+        return callback?.({ ok: false, erreur: "Message vide" });
       }
 
       try {
@@ -72,15 +87,38 @@ export function configurerSocket(io: Server) {
           return callback?.({ ok: false, erreur: "Accès refusé" });
         }
 
-        const message = await transaction(async (client) => {
+        const resultat = await transaction(async (client) => {
           const { rows } = await client.query(
             `INSERT INTO message (conversation_id, expediteur_id, contenu)
              VALUES ($1, $2, $3)
              RETURNING id, conversation_id, expediteur_id, contenu, envoye_le`,
-            [conversationId, utilisateurId, contenu.trim()]
+            [conversationId, utilisateurId, texte || null]
           );
 
           const nouveau = rows[0];
+          const mediasCrees: LigneMediaCreee[] = [];
+
+          for (const media of listeMedias) {
+            const { rows: ligneMedia } = await client.query<LigneMediaCreee>(
+              `INSERT INTO media
+                 (message_id, televerse_par, type, cle_objet, mime_type,
+                  taille_octets, largeur, hauteur, duree_ms)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               RETURNING id, type, cle_objet, mime_type, largeur, hauteur, duree_ms`,
+              [
+                nouveau.id,
+                utilisateurId,
+                media.type,
+                media.cleObjet,
+                media.mimeType,
+                media.tailleOctets ?? 0,
+                media.width ?? null,
+                media.height ?? null,
+                media.durationMs ?? null,
+              ]
+            );
+            mediasCrees.push(ligneMedia[0]);
+          }
 
           for (const dest of participants.filter((p) => p.utilisateur_id !== utilisateurId)) {
             await client.query(
@@ -89,23 +127,30 @@ export function configurerSocket(io: Server) {
             );
           }
 
-          return nouveau;
+          return { message: nouveau, medias: mediasCrees };
         });
 
         const messageApi = {
-          id: message.id,
-          conversationId: message.conversation_id,
-          senderId: message.expediteur_id,
-          text: message.contenu,
-          createdAt: message.envoye_le.toISOString(),
+          id: resultat.message.id,
+          conversationId: resultat.message.conversation_id,
+          senderId: resultat.message.expediteur_id,
+          text: resultat.message.contenu ?? undefined,
+          media: resultat.medias.length > 0
+            ? resultat.medias.map((m) => ({
+                id: m.id,
+                type: m.type,
+                url: urlSignee(m.cle_objet),
+                mimeType: m.mime_type,
+                width: m.largeur,
+                height: m.hauteur,
+                durationMs: m.duree_ms,
+              }))
+            : undefined,
+          createdAt: resultat.message.envoye_le.toISOString(),
           status: "sent",
         };
-
-        // Accusé de réception à l'expéditeur : il remplace son message optimiste
-        // par la version serveur (vrai id, vraie date)
+        
         callback?.({ ok: true, message: messageApi, idLocal });
-
-        // Diffusion aux autres participants
         socket.to(`conv:${conversationId}`).emit("message:nouveau", messageApi);
       } catch (err) {
         console.error("Erreur envoi :", err);

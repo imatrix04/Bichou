@@ -1,4 +1,6 @@
+import { Platform } from "react-native";
 import type { ChatMessage } from "../types/chat";
+import * as FileSystem from "expo-file-system/legacy";
 
 const BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -24,6 +26,12 @@ export interface ConversationApi {
   id: string;
   titre: string | null;
   cree_le: string;
+}
+
+export interface MediaTeleverse {
+  cleObjet: string;
+  mimeType: string;
+  tailleOctets: number;
 }
 
 export class ApiError extends Error {
@@ -107,4 +115,59 @@ export async function recupererMessages(
 
   const donnees = await reponse.json();
   return donnees.messages;
+}
+
+export async function televerserMedia(
+  token: string,
+  uri: string,
+  mimeType: string
+): Promise<MediaTeleverse> {
+  const extension = mimeType.split("/")[1] ?? "jpg";
+
+  if (Platform.OS !== "web") {
+    const resultat = await FileSystem.uploadAsync(
+      `${BASE_URL}/medias/televerser`,
+      uri,
+      {
+        httpMethod: "POST",
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: "fichier",
+        mimeType,
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (resultat.status < 200 || resultat.status >= 300) {
+      let message = "Échec du téléversement";
+      try {
+        message = JSON.parse(resultat.body).erreur ?? message;
+      } catch {}
+      throw new ApiError(message, resultat.status);
+    }
+
+    return JSON.parse(resultat.body);
+  }
+
+  const formData = new FormData();
+  const blobReponse = await fetch(uri);
+  const blob = await blobReponse.blob();
+  formData.append("fichier", blob, `media.${extension}`);
+
+  const reponse = await fetch(`${BASE_URL}/medias/televerser`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!reponse.ok) {
+    const donnees = await reponse.json().catch(() => ({}));
+    throw new ApiError(donnees.erreur ?? "Échec du téléversement", reponse.status);
+  }
+
+  return reponse.json();
+}
+
+/** Construit l'URL complète d'un média à partir de sa clé */
+export function urlComplete(chemin: string): string {
+  return `${BASE_URL}${chemin}`;
 }
