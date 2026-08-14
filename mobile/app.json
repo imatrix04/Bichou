@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Bichou-app-mobile",
-    "slug": "Bichou-app-mobile",
+    "name": "Bichou",
+    "slug": "bichou",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -18,7 +18,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "package": "com.shadowenterprise.bichou"
     },
     "web": {
       "output": "static",
@@ -41,11 +45,31 @@
           "cameraPermission": "Bichou a besoin de la caméra pour prendre une photo à partager."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "color": "#4F7CFF"
+        }
+      ],
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "12e4cf8a-a10d-4ff0-80be-7178596ac593"
+      }
+    },
+    "owner": "shadow-enterprise",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/12e4cf8a-a10d-4ff0-80be-7178596ac593"
     }
   }
 }

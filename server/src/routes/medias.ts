@@ -7,6 +7,7 @@ import { authRequise } from "../auth/middleware.js";
 import { stockage } from "../stockage/index.js";
 import { cheminFichier } from "../stockage/disque.js";
 import { verifierSignature } from "../stockage/signature.js";
+import { genererVignette, lireDimensions } from "../stockage/vignette.js";
 
 export const routeurMedias = Router();
 
@@ -47,10 +48,28 @@ routeurMedias.post("/televerser", authRequise, upload.single("fichier"), async (
       extension,
     });
 
+    // Vignette pour l'affichage en liste
+    let cleVignette: string | null = null;
+    const vignette = await genererVignette(req.file.buffer, req.file.mimetype);
+
+    if (vignette) {
+      cleVignette = await stockage.televerser({
+        buffer: vignette.buffer,
+        mimeType: "image/jpeg",
+        extension: "jpg",
+      });
+    }
+
+    // Dimensions réelles, plus fiables que celles envoyées par le client
+    const dimensions = await lireDimensions(req.file.buffer);
+
     res.status(201).json({
       cleObjet,
+      cleVignette,
       mimeType: req.file.mimetype,
       tailleOctets: req.file.size,
+      largeur: dimensions?.largeur,
+      hauteur: dimensions?.hauteur,
     });
   } catch (err) {
     console.error("Erreur téléversement :", err);

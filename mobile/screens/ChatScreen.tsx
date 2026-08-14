@@ -6,7 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   Text,
-  Image,
   Modal,
   StyleSheet,
   KeyboardAvoidingView,
@@ -15,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 
 import { useAuth } from "../contexts/AuthContext";
 import { useChat } from "../hooks/useChat";
@@ -27,7 +27,10 @@ import { urlComplete } from "../services/api";
 export default function ChatScreen() {
   const { colors } = useAppTheme();
   const { utilisateur, seDeconnecter } = useAuth();
-  const { messages, chargement, connecte, envoyerMessage, marquerCommeLus } = useChat();
+  const {
+    messages, chargement, chargementAncien, toutCharge, connecte, enTrainDEcrire,
+    envoyerMessage, marquerCommeLus, signalerFrappe, chargerPlusAnciens,
+  } = useChat();
 
   const [draft, setDraft] = useState("");
   const [pendingMedia, setPendingMedia] = useState<MediaAttachment | null>(null);
@@ -56,17 +59,13 @@ export default function ChatScreen() {
   }, []);
 
   const handleSend = useCallback(() => {
-    const trimmedText = draft.trim();
-    if (!trimmedText && !pendingMedia) return;
+      const trimmedText = draft.trim();
+      if (!trimmedText && !pendingMedia) return;
 
-    envoyerMessage(trimmedText, pendingMedia ?? undefined);
-    setDraft("");
-    setPendingMedia(null);
-
-    requestAnimationFrame(() => {
-      listRef.current?.scrollToEnd({ animated: true });
-    });
-  }, [draft, pendingMedia, envoyerMessage]);
+      envoyerMessage(trimmedText, pendingMedia ?? undefined);
+      setDraft("");
+      setPendingMedia(null);
+    }, [draft, pendingMedia, envoyerMessage]);
 
   const canSend = draft.trim().length > 0 || pendingMedia !== null;
 
@@ -108,10 +107,26 @@ export default function ChatScreen() {
               />
             )}
             contentContainerStyle={styles.listContent}
-            onContentSizeChange={() =>
-              listRef.current?.scrollToEnd({ animated: false })
+            inverted
+            onEndReached={chargerPlusAnciens}
+            onEndReachedThreshold={0.3}
+            ListFooterComponent={
+              chargementAncien ? (
+                <View style={styles.chargementAncien}>
+                  <ActivityIndicator size="small" color={colors.accent} />
+                </View>
+              ) : null
             }
+            maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
           />
+        )}
+
+        {enTrainDEcrire && (
+          <View style={styles.frappeRow}>
+            <Text style={[styles.frappeTexte, { color: colors.textSecondary }]}>
+              en train d'écrire…
+            </Text>
+          </View>
         )}
 
         {showAttachOptions && (
@@ -162,7 +177,10 @@ export default function ChatScreen() {
             placeholder="Écrire un message…"
             placeholderTextColor={colors.textSecondary}
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={(texte) => {
+              setDraft(texte);
+              signalerFrappe();
+            }}
             multiline
             blurOnSubmit={false}
             returnKeyType="send"
@@ -204,7 +222,8 @@ export default function ChatScreen() {
               <Image
                 source={{ uri: viewerMedia.uri }}
                 style={styles.viewerImage}
-                resizeMode="cover"
+                contentFit="cover"
+                cachePolicy="disk"
               />
             </View>
           )}
@@ -246,6 +265,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 12,
     paddingTop: 8,
+  },
+  chargementAncien: {
+    paddingVertical: 12,
+    alignItems: "center",
   },
   previewThumb: {
     width: 64,
@@ -296,6 +319,14 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "600",
     fontSize: 14,
+  },
+    frappeRow: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+  },
+  frappeTexte: {
+    fontSize: 12,
+    fontStyle: "italic",
   },
   attachOptionsRow: {
     flexDirection: "row",

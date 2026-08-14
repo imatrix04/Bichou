@@ -30,8 +30,11 @@ export interface ConversationApi {
 
 export interface MediaTeleverse {
   cleObjet: string;
+  cleVignette: string | null;
   mimeType: string;
   tailleOctets: number;
+  largeur?: number;
+  hauteur?: number;
 }
 
 export class ApiError extends Error {
@@ -100,10 +103,12 @@ export async function recupererConversations(token: string): Promise<Conversatio
 export async function recupererMessages(
   token: string,
   conversationId: string,
-  avant?: string
+  avant?: string,
+  limite = 20
 ): Promise<ChatMessage[]> {
   const url = new URL(`${BASE_URL}/messages/${conversationId}`);
   if (avant) url.searchParams.set("avant", avant);
+  url.searchParams.set("limite", String(limite));
 
   const reponse = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },

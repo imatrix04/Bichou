@@ -1,22 +1,29 @@
 import { createHmac } from "node:crypto";
 import { config } from "../config.js";
 
-const DUREE_VALIDITE_MS = 60 * 60 * 1000; // 1 heure
+// Les URL sont valides pendant une fenêtre alignée sur des tranches fixes.
+// Deux appels dans la même tranche produisent la MÊME url, ce qui permet
+// au cache disque du client de fonctionner.
+const TAILLE_FENETRE_MS = 24 * 60 * 60 * 1000; // 1 jour
+const NB_FENETRES_VALIDITE = 3; // l'url reste valable ~3 jours
 
-/** Calcule la signature d'une clé d'objet pour une date d'expiration donnée */
 function calculerSignature(cleObjet: string, expiration: number): string {
   return createHmac("sha256", config.jwtSecret)
     .update(`${cleObjet}:${expiration}`)
     .digest("hex");
 }
 
-/** Retourne les paramètres de requête à ajouter à l'URL */
+/** Expiration alignée sur la tranche courante : stable pendant 24h */
+function expirationStable(): number {
+  const fenetreCourante = Math.floor(Date.now() / TAILLE_FENETRE_MS);
+  return (fenetreCourante + NB_FENETRES_VALIDITE) * TAILLE_FENETRE_MS;
+}
+
 export function signerCle(cleObjet: string): { expire: number; signature: string } {
-  const expire = Date.now() + DUREE_VALIDITE_MS;
+  const expire = expirationStable();
   return { expire, signature: calculerSignature(cleObjet, expire) };
 }
 
-/** Vérifie qu'une signature est valide et non expirée */
 export function verifierSignature(
   cleObjet: string,
   expire: unknown,
@@ -28,8 +35,6 @@ export function verifierSignature(
   if (!Number.isFinite(expiration) || expiration < Date.now()) return false;
 
   const attendue = calculerSignature(cleObjet, expiration);
-
-  // Comparaison à temps constant pour éviter les attaques temporelles
   if (attendue.length !== signature.length) return false;
 
   let difference = 0;

@@ -10,7 +10,11 @@ export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [chargement, setChargement] = useState(true);
+  const [chargementAncien, setChargementAncien] = useState(false);
+  const [toutCharge, setToutCharge] = useState(false);
   const [connecte, setConnecte] = useState(false);
+  const [enTrainDEcrire, setEnTrainDEcrire] = useState(false);
+  const timerFrappeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socketRef = useRef<ReturnType<typeof connecterSocket> | null>(null);
 
   // Chargement initial : conversation + historique
@@ -25,11 +29,12 @@ export function useChat() {
         if (annule || conversations.length === 0) return;
 
         const conv = conversations[0];
-        const historique = await recupererMessages(token, conv.id);
+        const historique = await recupererMessages(token, conv.id, undefined, 20);
 
         if (annule) return;
         setConversationId(conv.id);
-        setMessages(historique);
+        // Liste inversée : le plus récent en premier
+        setMessages(historique.reverse());
       } catch (err) {
         console.error("Erreur chargement chat :", err);
       } finally {
@@ -52,10 +57,14 @@ export function useChat() {
     socket.on("connect", () => setConnecte(true));
     socket.on("disconnect", () => setConnecte(false));
 
+    socket.on("frappe", ({ actif }: { actif: boolean }) => {
+      setEnTrainDEcrire(actif);
+    });
+
     socket.on("message:nouveau", (message: ChatMessage) => {
       setMessages((prev) => {
         if (prev.some((m) => m.id === message.id)) return prev;
-        return [...prev, message];
+        return [message, ...prev];
       });
     });
 
@@ -70,12 +79,58 @@ export function useChat() {
       socket.off("disconnect");
       socket.off("message:nouveau");
       socket.off("message:statut");
+      socket.off("frappe");
       deconnecterSocket();
       socketRef.current = null;
     };
   }, [token]);
 
-    const envoyerMessage = useCallback(
+  const chargerPlusAnciens = useCallback(async () => {
+    if (!token || !conversationId || chargementAncien || toutCharge) return;
+    if (messages.length === 0) return;
+
+    setChargementAncien(true);
+
+    try {
+      // Liste inversée : le plus ancien est en dernière position
+      const lePlusAncien = messages[messages.length - 1];
+      const anciens = await recupererMessages(
+        token,
+        conversationId,
+        lePlusAncien.createdAt,
+        20
+      );
+
+      if (anciens.length === 0) {
+        setToutCharge(true);
+      } else {
+        setMessages((prev) => {
+          const idsExistants = new Set(prev.map((m) => m.id));
+          const nouveaux = anciens.reverse().filter((m) => !idsExistants.has(m.id));
+          return [...prev, ...nouveaux];
+        });
+      }
+    } catch (err) {
+      console.error("Erreur chargement historique :", err);
+    } finally {
+      setChargementAncien(false);
+    }
+  }, [token, conversationId, messages, chargementAncien, toutCharge]);
+
+  const signalerFrappe = useCallback(() => {
+    const socket = socketRef.current;
+    if (!socket || !conversationId) return;
+
+    socket.emit("frappe", { conversationId, actif: true });
+
+    // On annule le signal après 2s d'inactivité
+    if (timerFrappeRef.current) clearTimeout(timerFrappeRef.current);
+    timerFrappeRef.current = setTimeout(() => {
+      socket.emit("frappe", { conversationId, actif: false });
+    }, 2000);
+  }, [conversationId]);
+
+  const envoyerMessage = useCallback(
     async (contenu: string, media?: MediaAttachment) => {
       const socket = socketRef.current;
       if (!socket || !conversationId || !utilisateur || !token) return;
@@ -92,7 +147,7 @@ export function useChat() {
         status: "sending",
       };
 
-      setMessages((prev) => [...prev, optimiste]);
+      setMessages((prev) => [optimiste, ...prev]);
 
       try {
         let mediasPayload: unknown[] = [];
@@ -108,10 +163,11 @@ export function useChat() {
             {
               type: media.type,
               cleObjet: televerse.cleObjet,
+              cleVignette: televerse.cleVignette,
               mimeType: televerse.mimeType,
               tailleOctets: televerse.tailleOctets,
-              width: media.width,
-              height: media.height,
+              width: televerse.largeur ?? media.width,
+              height: televerse.hauteur ?? media.height,
               durationMs: media.durationMs,
             },
           ];
@@ -159,9 +215,14 @@ export function useChat() {
   return {
     messages,
     chargement,
+    chargementAncien,
+    toutCharge,
     connecte,
     conversationId,
+    enTrainDEcrire,
     envoyerMessage,
     marquerCommeLus,
+    signalerFrappe,
+    chargerPlusAnciens,
   };
 }

@@ -11,6 +11,7 @@ interface LigneMediaCreee {
   id: string;
   type: string;
   cle_objet: string;
+  cle_vignette: string | null;
   mime_type: string;
   largeur: number | null;
   hauteur: number | null;
@@ -101,15 +102,16 @@ export function configurerSocket(io: Server) {
           for (const media of listeMedias) {
             const { rows: ligneMedia } = await client.query<LigneMediaCreee>(
               `INSERT INTO media
-                 (message_id, televerse_par, type, cle_objet, mime_type,
+                 (message_id, televerse_par, type, cle_objet, cle_vignette, mime_type,
                   taille_octets, largeur, hauteur, duree_ms)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-               RETURNING id, type, cle_objet, mime_type, largeur, hauteur, duree_ms`,
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+               RETURNING id, type, cle_objet, cle_vignette, mime_type, largeur, hauteur, duree_ms`,
               [
                 nouveau.id,
                 utilisateurId,
                 media.type,
                 media.cleObjet,
+                media.cleVignette ?? null,
                 media.mimeType,
                 media.tailleOctets ?? 0,
                 media.width ?? null,
@@ -140,6 +142,7 @@ export function configurerSocket(io: Server) {
                 id: m.id,
                 type: m.type,
                 url: urlSignee(m.cle_objet),
+                urlVignette: m.cle_vignette ? urlSignee(m.cle_vignette) : undefined,
                 mimeType: m.mime_type,
                 width: m.largeur,
                 height: m.hauteur,
@@ -149,7 +152,7 @@ export function configurerSocket(io: Server) {
           createdAt: resultat.message.envoye_le.toISOString(),
           status: "sent",
         };
-        
+
         callback?.({ ok: true, message: messageApi, idLocal });
         socket.to(`conv:${conversationId}`).emit("message:nouveau", messageApi);
       } catch (err) {
@@ -190,8 +193,21 @@ export function configurerSocket(io: Server) {
       });
     });
 
-    socket.on("disconnect", (raison) => {
+    socket.on("disconnect", async (raison) => {
       console.log(`Déconnecté : ${socket.utilisateur!.login} (${raison})`);
+
+      // Coupe l'indicateur de frappe resté actif
+      const conversations = await query<{ conversation_id: string }>(
+        `SELECT conversation_id FROM participation WHERE utilisateur_id = $1`,
+        [utilisateurId]
+      ).catch(() => []);
+
+      for (const { conversation_id } of conversations) {
+        socket.to(`conv:${conversation_id}`).emit("frappe", {
+          utilisateurId,
+          actif: false,
+        });
+      }
     });
   });
 }

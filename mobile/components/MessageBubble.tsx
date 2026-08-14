@@ -1,7 +1,8 @@
 // components/MessageBubble.tsx
 import React from "react";
-import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
 import { ChatMessage } from "../types/chat";
 import { useAppTheme } from "../hooks/useAppTheme";
 
@@ -43,16 +44,32 @@ export default function MessageBubble({ message, isOwnMessage, onMediaPress }: P
         ]}
       >
         {message.media?.map((m) => {
-          const source = m.url ? urlComplete(m.url) : m.uri;
+          // En liste on affiche la vignette ; le plein écran charge l'original
+          const source = m.urlVignette
+            ? urlComplete(m.urlVignette)
+            : m.url
+            ? urlComplete(m.url)
+            : m.uri;
+
+          const sourcePleineTaille = m.url ? urlComplete(m.url) : m.uri;
+
           if (!source) return null;
 
           return (
             <TouchableOpacity
               key={m.id}
               activeOpacity={0.85}
-              onPress={() => m.type === "image" && onMediaPress?.(source)}
+              onPress={() =>
+                m.type === "image" && sourcePleineTaille && onMediaPress?.(sourcePleineTaille)
+              }
             >
-              <Image source={{ uri: source }} style={styles.media} resizeMode="cover" />
+              <Image
+                source={{ uri: source }}
+                style={styles.media}
+                contentFit="cover"
+                cachePolicy="disk"
+                transition={150}
+              />
             </TouchableOpacity>
           );
         })}

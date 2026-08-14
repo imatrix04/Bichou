@@ -13,9 +13,8 @@ export type MediaType = "image" | "video";
 export interface MediaAttachment {
   id: string;
   type: MediaType;
-  /** URL signée fournie par le serveur (média déjà envoyé) */
   url?: string;
-  /** URI locale sur le téléphone (média pas encore envoyé) */
+  urlVignette?: string;
   uri?: string;
   mimeType?: string;
   width?: number;
