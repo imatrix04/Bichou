@@ -14,6 +14,13 @@ interface Props {
   onMediaPress?: (uri: string) => void;
 }
 
+// Même palette rose gold que ChatScreen.tsx — à terme, ça peut migrer
+// dans useAppTheme.ts pour être partagé sans duplication.
+const ROSE = {
+  gold: "#C08A94",
+  goldDeep: "#9C5B66",
+};
+
 function StatusIcon({ status, colors }: { status: ChatMessage["status"]; colors: ReturnType<typeof useAppTheme>["colors"] }) {
   switch (status) {
     case "sending":
@@ -23,7 +30,9 @@ function StatusIcon({ status, colors }: { status: ChatMessage["status"]; colors:
     case "delivered":
       return <Ionicons name="checkmark-done" size={14} color={colors.statusDefault} />;
     case "read":
-      return <Ionicons name="checkmark-done" size={14} color={colors.statusRead} />;
+      // Touche romantique : un message lu devient un petit cœur plein
+      // plutôt qu'un double-check classique.
+      return <Ionicons name="heart" size={13} color={ROSE.gold} />;
     case "failed":
       return <Ionicons name="alert-circle" size={14} color={colors.statusFailed} />;
     default:
@@ -39,7 +48,10 @@ export default function MessageBubble({ message, isOwnMessage, onMediaPress }: P
       <View
         style={[
           styles.bubble,
-          { backgroundColor: isOwnMessage ? colors.bubbleOwn : colors.bubbleOther },
+          {
+            backgroundColor: isOwnMessage ? ROSE.gold : colors.bubbleOther,
+            shadowColor: isOwnMessage ? ROSE.goldDeep : "#000",
+          },
           isOwnMessage ? styles.bubbleOwnShape : styles.bubbleOtherShape,
         ]}
       >
@@ -75,13 +87,13 @@ export default function MessageBubble({ message, isOwnMessage, onMediaPress }: P
         })}
 
         {message.text ? (
-          <Text style={[styles.text, { color: isOwnMessage ? colors.textOwn : colors.textOther }]}>
+          <Text style={[styles.text, { color: isOwnMessage ? "#FFFFFF" : colors.textOther }]}>
             {message.text}
           </Text>
         ) : null}
 
         <View style={styles.footerRow}>
-          <Text style={[styles.time, { color: isOwnMessage ? "rgba(255,255,255,0.7)" : colors.textSecondary }]}>
+          <Text style={[styles.time, { color: isOwnMessage ? "rgba(255,255,255,0.75)" : colors.textSecondary }]}>
             {new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
           </Text>
           {isOwnMessage && (
@@ -109,15 +121,19 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: "78%",
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 2,
   },
   bubbleOwnShape: {
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 6,
   },
   bubbleOtherShape: {
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 6,
   },
   text: {
     fontSize: 15,
@@ -126,7 +142,7 @@ const styles = StyleSheet.create({
   media: {
     width: 220,
     height: 150,
-    borderRadius: 10,
+    borderRadius: 14,
     marginBottom: 6,
   },
   footerRow: {

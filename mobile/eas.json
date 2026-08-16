@@ -16,7 +16,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://a-definir-plus-tard"
+        "EXPO_PUBLIC_API_URL": "https://bichou-back.fr"
       }
     },
     "production": {
@@ -27,7 +27,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://a-definir-plus-tard"
+        "EXPO_PUBLIC_API_URL": "https://bichou-back.fr"
       }
     }
   },

@@ -22,10 +22,20 @@ interface ReponseAuth {
   utilisateur: UtilisateurApi;
 }
 
+// Infos minimales sur l'autre participant d'une conversation, pour
+// affichage (header du ChatScreen, etc.). Peut être null juste après
+// l'inscription du premier compte, avant que le partenaire ait créé le sien.
+export interface AutreUtilisateurApi {
+  id: string;
+  nomAffiche: string;
+  avatarUrl: string | null;
+}
+
 export interface ConversationApi {
   id: string;
   titre: string | null;
   cree_le: string;
+  autreUtilisateur: AutreUtilisateurApi | null;
 }
 
 export interface MediaTeleverse {
@@ -120,6 +130,14 @@ export async function recupererMessages(
 
   const donnees = await reponse.json();
   return donnees.messages;
+}
+
+export async function enregistrerAppareil(
+  token: string,
+  tokenPush: string,
+  plateforme: string
+): Promise<void> {
+  await post<void>("/appareils", { tokenPush, plateforme }, token);
 }
 
 export async function televerserMedia(

@@ -1,5 +1,6 @@
 // contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { Platform } from "react-native";
 import {
   connexion as apiConnexion,
   inscription as apiInscription,
@@ -7,6 +8,8 @@ import {
   type UtilisateurApi,
 } from "../services/api";
 import { lire, ecrire, supprimer } from "../utils/stockageSecurise";
+import { enregistrerPourNotifications } from "../services/notifications";
+import { enregistrerAppareil } from "../services/api";
 
 const CLE_TOKEN = "bichou_token";
 
@@ -36,6 +39,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const profil = await recupererProfil(tokenStocke);
         setToken(tokenStocke);
         setUtilisateur(profil);
+        synchroniserPushToken(tokenStocke);
       } catch {
         // Token expiré ou serveur injoignable : on repart sur l'écran de connexion
         await supprimer(CLE_TOKEN);
@@ -50,6 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await ecrire(CLE_TOKEN, nouveauToken);
     setToken(nouveauToken);
     setUtilisateur(profil);
+    synchroniserPushToken(nouveauToken);
   }, []);
 
   const sInscrire = useCallback(
@@ -62,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await ecrire(CLE_TOKEN, nouveauToken);
       setToken(nouveauToken);
       setUtilisateur(profil);
+      synchroniserPushToken(nouveauToken);
     },
     []
   );
@@ -87,4 +93,15 @@ export function useAuth() {
     throw new Error("useAuth doit être utilisé dans un AuthProvider");
   }
   return contexte;
+}
+
+async function synchroniserPushToken(token: string) {
+  try {
+    const tokenPush = await enregistrerPourNotifications();
+    if (tokenPush) {
+      await enregistrerAppareil(token, tokenPush, Platform.OS);
+    }
+  } catch (err) {
+    console.error("Erreur enregistrement push :", err);
+  }
 }

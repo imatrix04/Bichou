@@ -2,13 +2,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { connecterSocket, deconnecterSocket } from "../services/socket";
-import { recupererConversations, recupererMessages, televerserMedia } from "../services/api";
+import {
+  recupererConversations,
+  recupererMessages,
+  televerserMedia,
+  type AutreUtilisateurApi,
+} from "../services/api";
 import type { ChatMessage, MediaAttachment } from "../types/chat";
 
 export function useChat() {
   const { token, utilisateur } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [autreUtilisateur, setAutreUtilisateur] = useState<AutreUtilisateurApi | null>(null);
   const [chargement, setChargement] = useState(true);
   const [chargementAncien, setChargementAncien] = useState(false);
   const [toutCharge, setToutCharge] = useState(false);
@@ -33,6 +39,7 @@ export function useChat() {
 
         if (annule) return;
         setConversationId(conv.id);
+        setAutreUtilisateur(conv.autreUtilisateur);
         // Liste inversée : le plus récent en premier
         setMessages(historique.reverse());
       } catch (err) {
@@ -219,6 +226,7 @@ export function useChat() {
     toutCharge,
     connecte,
     conversationId,
+    autreUtilisateur,
     enTrainDEcrire,
     envoyerMessage,
     marquerCommeLus,

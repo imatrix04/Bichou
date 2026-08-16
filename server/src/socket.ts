@@ -2,6 +2,7 @@ import type { Server, Socket } from "socket.io";
 import { verifierToken, type PayloadToken } from "./auth/jwt.js";
 import { query, transaction } from "./db.js";
 import { urlSignee } from "./stockage/url.js";
+import { envoyerPushMessage } from "./notifications/push.js";
 
 interface SocketAuthentifie extends Socket {
   utilisateur?: PayloadToken;
@@ -18,6 +19,11 @@ interface LigneMediaCreee {
   duree_ms: number | null;
 }
 
+const utilisateursConnectes = new Map<string, Set<string>>();
+
+function estConnecte(utilisateurId: string): boolean {
+  return (utilisateursConnectes.get(utilisateurId)?.size ?? 0) > 0;
+}
 
 export function configurerSocket(io: Server) {
   // Middleware d'authentification : rejette toute connexion sans token valide
@@ -41,6 +47,11 @@ export function configurerSocket(io: Server) {
   io.on("connection", async (socket: SocketAuthentifie) => {
     const utilisateurId = socket.utilisateur!.utilisateurId;
     console.log(`Connecté : ${socket.utilisateur!.login}`);
+    
+    if (!utilisateursConnectes.has(utilisateurId)) {
+      utilisateursConnectes.set(utilisateurId, new Set());
+    }
+    utilisateursConnectes.get(utilisateurId)!.add(socket.id);
 
     // L'utilisateur rejoint une room par conversation à laquelle il participe
     try {
@@ -155,6 +166,20 @@ export function configurerSocket(io: Server) {
 
         callback?.({ ok: true, message: messageApi, idLocal });
         socket.to(`conv:${conversationId}`).emit("message:nouveau", messageApi);
+
+        for (const dest of participants) {
+          if (dest.utilisateur_id === utilisateurId) continue;
+          if (estConnecte(dest.utilisateur_id)) continue;
+
+          const apercu = texte || (listeMedias.length > 0 ? "Nouvelle photo" : "Nouveau message");
+          envoyerPushMessage(
+            dest.utilisateur_id,
+            socket.utilisateur!.login,
+            apercu,
+            { conversationId }
+          ).catch((err) => console.error("Erreur push :", err));
+        }
+        
       } catch (err) {
         console.error("Erreur envoi :", err);
         callback?.({ ok: false, erreur: "Erreur serveur" });
@@ -195,6 +220,12 @@ export function configurerSocket(io: Server) {
 
     socket.on("disconnect", async (raison) => {
       console.log(`Déconnecté : ${socket.utilisateur!.login} (${raison})`);
+
+        const sockets = utilisateursConnectes.get(utilisateurId);
+        sockets?.delete(socket.id);
+        if (sockets && sockets.size === 0) {
+          utilisateursConnectes.delete(utilisateurId);
+        }
 
       // Coupe l'indicateur de frappe resté actif
       const conversations = await query<{ conversation_id: string }>(

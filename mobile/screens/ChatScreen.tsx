@@ -24,13 +24,31 @@ import { ChatMessage, MediaAttachment } from "../types/chat";
 import { pickFromCamera, pickFromLibrary } from "../utils/mediaPicker";
 import { urlComplete } from "../services/api";
 
+// Palette romantique rose poudré / rose gold — pensée comme un accent
+// posé par-dessus le thème clair/sombre existant (colors.*), pas en
+// remplacement des couleurs fonctionnelles (fond, texte).
+// Si tu veux la rendre réutilisable ailleurs, ça peut migrer dans
+// useAppTheme.ts plus tard.
+const ROSE = {
+  blush: "#F7E1E4", // rose très clair, pour les puces/chips
+  blushDark: "#3A2C30", // équivalent sombre du blush pour le dark mode
+  petal: "#F2C6CC", // rose doux, bordures
+  gold: "#C08A94", // rose gold principal
+  goldDeep: "#9C5B66", // rose gold plus soutenu (texte, icônes actives)
+};
+
 export default function ChatScreen() {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const { utilisateur, seDeconnecter } = useAuth();
   const {
-    messages, chargement, chargementAncien, toutCharge, connecte, enTrainDEcrire,
+    messages, chargement, chargementAncien, toutCharge, connecte, autreUtilisateur, enTrainDEcrire,
     envoyerMessage, marquerCommeLus, signalerFrappe, chargerPlusAnciens,
   } = useChat();
+
+  // Le partenaire peut ne pas encore avoir de compte juste après l'inscription
+  // (la conversation est créée avant le second compte) — on garde "Bichou"
+  // comme repli le temps que ça se connecte.
+  const nomEnTete = autreUtilisateur?.nomAffiche ?? "Bichou";
 
   const [draft, setDraft] = useState("");
   const [pendingMedia, setPendingMedia] = useState<MediaAttachment | null>(null);
@@ -38,9 +56,19 @@ export default function ChatScreen() {
   const [showAttachOptions, setShowAttachOptions] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
+  const chipBackground = isDark ? ROSE.blushDark : ROSE.blush;
+
   useEffect(() => {
     if (!chargement) marquerCommeLus();
   }, [chargement, messages.length, marquerCommeLus]);
+
+  // Scroll automatique en bas à chaque nouveau message (liste inversée,
+  // donc offset 0 = bas de l'écran)
+  useEffect(() => {
+    if (messages.length > 0) {
+      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }
+  }, [messages.length]);
 
   const toggleAttachOptions = useCallback(() => {
     setShowAttachOptions((prev) => !prev);
@@ -71,12 +99,16 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: colors.headerBorder }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Bichou{connecte ? "" : " (hors ligne)"}
-        </Text>
+      <View style={[styles.header, { borderBottomColor: ROSE.gold }]}>
+        <View style={styles.headerTitleRow}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{nomEnTete}</Text>
+          <Ionicons name="heart" size={14} color={ROSE.gold} style={styles.headerHeart} />
+          {!connecte && (
+            <Text style={[styles.headerStatus, { color: colors.textSecondary }]}>hors ligne</Text>
+          )}
+        </View>
         <TouchableOpacity onPress={seDeconnecter}>
-          <Ionicons name="log-out-outline" size={22} color={colors.accent} />
+          <Ionicons name="log-out-outline" size={22} color={ROSE.goldDeep} />
         </TouchableOpacity>
       </View>
 
@@ -87,7 +119,7 @@ export default function ChatScreen() {
       >
         {chargement ? (
           <View style={styles.centre}>
-            <ActivityIndicator size="large" color={colors.accent} />
+            <ActivityIndicator size="large" color={ROSE.gold} />
           </View>
         ) : (
           <FlatList
@@ -113,7 +145,7 @@ export default function ChatScreen() {
             ListFooterComponent={
               chargementAncien ? (
                 <View style={styles.chargementAncien}>
-                  <ActivityIndicator size="small" color={colors.accent} />
+                  <ActivityIndicator size="small" color={ROSE.gold} />
                 </View>
               ) : null
             }
@@ -123,7 +155,8 @@ export default function ChatScreen() {
 
         {enTrainDEcrire && (
           <View style={styles.frappeRow}>
-            <Text style={[styles.frappeTexte, { color: colors.textSecondary }]}>
+            <Ionicons name="heart" size={11} color={ROSE.goldDeep} style={styles.frappeHeart} />
+            <Text style={[styles.frappeTexte, { color: ROSE.goldDeep }]}>
               en train d'écrire…
             </Text>
           </View>
@@ -132,17 +165,17 @@ export default function ChatScreen() {
         {showAttachOptions && (
           <View style={styles.attachOptionsRow}>
             <TouchableOpacity
-              style={[styles.attachOptionButton, { backgroundColor: colors.inputBackground }]}
+              style={[styles.attachOptionButton, { backgroundColor: chipBackground }]}
               onPress={handlePickCamera}
             >
-              <Ionicons name="camera-outline" size={22} color={colors.accent} />
+              <Ionicons name="camera-outline" size={20} color={ROSE.goldDeep} />
               <Text style={[styles.attachOptionLabel, { color: colors.text }]}>Appareil photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.attachOptionButton, { backgroundColor: colors.inputBackground }]}
+              style={[styles.attachOptionButton, { backgroundColor: chipBackground }]}
               onPress={handlePickLibrary}
             >
-              <Ionicons name="image-outline" size={22} color={colors.accent} />
+              <Ionicons name="image-outline" size={20} color={ROSE.goldDeep} />
               <Text style={[styles.attachOptionLabel, { color: colors.text }]}>Galerie</Text>
             </TouchableOpacity>
           </View>
@@ -150,49 +183,58 @@ export default function ChatScreen() {
 
         {pendingMedia && (
           <View style={styles.previewRow}>
-            <Image source={{ uri: pendingMedia.uri }} style={styles.previewThumb} />
+            <Image source={{ uri: pendingMedia.uri }} style={[styles.previewThumb, { borderColor: ROSE.petal }]} />
             <TouchableOpacity
-              style={[styles.previewRemove, { backgroundColor: colors.inputBackground }]}
+              style={[styles.previewRemove, { backgroundColor: chipBackground }]}
               onPress={() => setPendingMedia(null)}
             >
-              <Text style={[styles.previewRemoveText, { color: colors.text }]}>✕</Text>
+              <Text style={[styles.previewRemoveText, { color: ROSE.goldDeep }]}>✕</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        <View style={[styles.inputBar, { borderTopColor: colors.headerBorder, backgroundColor: colors.background }]}>
-          <TouchableOpacity
-            style={[styles.attachButton, { backgroundColor: colors.inputBackground }]}
-            onPress={toggleAttachOptions}
-          >
-            <Ionicons
-              name={showAttachOptions ? "close" : "add"}
-              size={22}
-              color={colors.accent}
-            />
-          </TouchableOpacity>
+        <View style={[styles.inputBar, { backgroundColor: colors.background }]}>
+          <View style={[styles.inputCard, { backgroundColor: colors.inputBackground, shadowColor: ROSE.goldDeep }]}>
+            <TouchableOpacity
+              style={[styles.attachButton, { backgroundColor: chipBackground }]}
+              onPress={toggleAttachOptions}
+            >
+              <Ionicons
+                name={showAttachOptions ? "close" : "add"}
+                size={20}
+                color={ROSE.goldDeep}
+              />
+            </TouchableOpacity>
 
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
-            placeholder="Écrire un message…"
-            placeholderTextColor={colors.textSecondary}
-            value={draft}
-            onChangeText={(texte) => {
-              setDraft(texte);
-              signalerFrappe();
-            }}
-            multiline
-            blurOnSubmit={false}
-            returnKeyType="send"
-            onSubmitEditing={handleSend}
-          />
-          <TouchableOpacity
-            style={[styles.sendButton, { backgroundColor: canSend ? colors.accent : colors.accentMuted }]}
-            onPress={handleSend}
-            disabled={!canSend}
-          >
-            <Text style={styles.sendButtonText}>Envoyer</Text>
-          </TouchableOpacity>
+            <TextInput
+              style={[styles.input, { color: colors.text }]}
+              placeholder="Écrire un mot doux…"
+              placeholderTextColor={colors.textSecondary}
+              value={draft}
+              onChangeText={(texte) => {
+                setDraft(texte);
+                signalerFrappe();
+              }}
+              multiline
+              blurOnSubmit={false}
+              returnKeyType="send"
+              onSubmitEditing={handleSend}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                { backgroundColor: canSend ? ROSE.gold : chipBackground },
+              ]}
+              onPress={handleSend}
+              disabled={!canSend}
+            >
+              <Ionicons
+                name="heart"
+                size={17}
+                color={canSend ? "#FFFFFF" : ROSE.goldDeep}
+              />
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
 
@@ -249,22 +291,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderBottomWidth: 1.5,
+  },
+  headerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 20,
+    fontWeight: "700",
+    letterSpacing: 0.4,
+  },
+  headerHeart: {
+    marginLeft: 6,
+  },
+  headerStatus: {
+    marginLeft: 8,
+    fontSize: 12,
+    fontStyle: "italic",
   },
   listContent: {
-    paddingVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 4,
   },
   previewRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 10,
   },
   chargementAncien: {
     paddingVertical: 12,
@@ -273,7 +329,8 @@ const styles = StyleSheet.create({
   previewThumb: {
     width: 64,
     height: 64,
-    borderRadius: 8,
+    borderRadius: 16,
+    borderWidth: 1.5,
   },
   previewRemove: {
     marginLeft: 10,
@@ -287,11 +344,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   inputBar: {
+    paddingHorizontal: 12,
+    paddingTop: 6,
+    paddingBottom: 10,
+  },
+  inputCard: {
     flexDirection: "row",
     alignItems: "flex-end",
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderRadius: 26,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 3,
   },
   attachButton: {
     width: 36,
@@ -299,30 +365,31 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 8,
+    marginRight: 6,
   },
   input: {
     flex: 1,
     maxHeight: 100,
-    borderRadius: 18,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 8,
     fontSize: 15,
-    marginRight: 8,
+    marginRight: 6,
   },
   sendButton: {
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  sendButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-    fontSize: 14,
-  },
-    frappeRow: {
-    paddingHorizontal: 16,
+  frappeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 18,
     paddingVertical: 4,
+  },
+  frappeHeart: {
+    marginRight: 5,
   },
   frappeTexte: {
     fontSize: 12,
@@ -330,8 +397,8 @@ const styles = StyleSheet.create({
   },
   attachOptionsRow: {
     flexDirection: "row",
-    paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     gap: 10,
   },
   attachOptionButton: {

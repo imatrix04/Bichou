@@ -70,7 +70,7 @@ export default function AuthScreen() {
 
           <TextInput
             style={[styles.champ, { backgroundColor: colors.inputBackground, color: colors.text }]}
-            placeholder="Identifiant"
+            placeholder="Nom d'utilisateur"
             placeholderTextColor={colors.textSecondary}
             value={login}
             onChangeText={setLogin}

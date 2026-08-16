@@ -173,17 +173,51 @@ routeurMessages.post("/:conversationId", authRequise, async (req, res) => {
   }
 });
 
-// GET /messages/conversations/mes — récupère la conversation de l'utilisateur
+interface LigneConversation {
+  id: string;
+  titre: string | null;
+  cree_le: Date;
+  autre_utilisateur_id: string | null;
+  autre_nom_affiche: string | null;
+  autre_avatar_url: string | null;
+}
+
+// GET /messages/conversations/mes — récupère la conversation de l'utilisateur,
+// avec les infos de l'autre participant (nom, avatar) pour l'affichage côté front.
+// LEFT JOIN volontaire : au moment de l'inscription du premier compte, la
+// conversation est créée avant que le second utilisateur n'existe, donc
+// l'autre participant peut être absent temporairement.
 routeurMessages.get("/conversations/mes", authRequise, async (req, res) => {
   try {
-    const conversations = await query(
-      `SELECT c.id, c.titre, c.cree_le
+    const utilisateurId = req.utilisateur!.utilisateurId;
+
+    const lignes = await query<LigneConversation>(
+      `SELECT c.id, c.titre, c.cree_le,
+              u.id AS autre_utilisateur_id,
+              u.nom_affiche AS autre_nom_affiche,
+              u.avatar_url AS autre_avatar_url
        FROM conversation c
-       JOIN participation p ON p.conversation_id = c.id
-       WHERE p.utilisateur_id = $1
+       JOIN participation p
+         ON p.conversation_id = c.id AND p.utilisateur_id = $1
+       LEFT JOIN participation p_autre
+         ON p_autre.conversation_id = c.id AND p_autre.utilisateur_id <> $1
+       LEFT JOIN utilisateur u ON u.id = p_autre.utilisateur_id
        ORDER BY c.cree_le`,
-      [req.utilisateur!.utilisateurId]
+      [utilisateurId]
     );
+
+    const conversations = lignes.map((l) => ({
+      id: l.id,
+      titre: l.titre,
+      cree_le: l.cree_le,
+      autreUtilisateur: l.autre_utilisateur_id
+        ? {
+            id: l.autre_utilisateur_id,
+            nomAffiche: l.autre_nom_affiche,
+            avatarUrl: l.autre_avatar_url,
+          }
+        : null,
+    }));
 
     res.json({ conversations });
   } catch (err) {

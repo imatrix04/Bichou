@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "440070918580",
+    "project_id": "bichou-b8d7b",
+    "storage_bucket": "bichou-b8d7b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:440070918580:android:dad68dfba7fd07bdef62e1",
+        "android_client_info": {
+          "package_name": "com.shadowenterprise.bichou"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkOzK700j_PIYUwbPYB5b1PR16RWRVUTE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
