@@ -1,5 +1,6 @@
 // hooks/useChat.ts
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { connecterSocket, deconnecterSocket } from "../services/socket";
 import {
@@ -22,6 +23,29 @@ export function useChat() {
   const [enTrainDEcrire, setEnTrainDEcrire] = useState(false);
   const timerFrappeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socketRef = useRef<ReturnType<typeof connecterSocket> | null>(null);
+
+  const statutsEnAttenteRef = useRef<Map<string, ChatMessage["status"]>>(new Map());
+  const conversationIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
+
+  const resynchroniser = useCallback(async () => {
+    const convId = conversationIdRef.current;
+    if (!token || !convId) return;
+
+    try {
+      const recents = await recupererMessages(token, convId, undefined, 20);
+      setMessages((prev) => {
+        const idsExistants = new Set(prev.map((m) => m.id));
+        const nouveaux = recents.filter((m) => !idsExistants.has(m.id)).reverse();
+        return nouveaux.length > 0 ? [...nouveaux, ...prev] : prev;
+      });
+    } catch (err) {
+      console.error("Erreur resynchronisation :", err);
+    }
+  }, [token]);
 
   // Chargement initial : conversation + historique
   useEffect(() => {
@@ -61,7 +85,10 @@ export function useChat() {
     const socket = connecterSocket(token);
     socketRef.current = socket;
 
-    socket.on("connect", () => setConnecte(true));
+    socket.on("connect", () => {
+      setConnecte(true);
+      resynchroniser();
+    });
     socket.on("disconnect", () => setConnecte(false));
 
     socket.on("frappe", ({ actif }: { actif: boolean }) => {
@@ -76,9 +103,13 @@ export function useChat() {
     });
 
     socket.on("message:statut", ({ messageIds, statut }) => {
-      setMessages((prev) =>
-        prev.map((m) => (messageIds.includes(m.id) ? { ...m, status: statut } : m))
-      );
+      setMessages((prev) => {
+        const idsPresents = new Set(prev.map((m) => m.id));
+        for (const id of messageIds as string[]) {
+          if (!idsPresents.has(id)) statutsEnAttenteRef.current.set(id, statut);
+        }
+        return prev.map((m) => (messageIds.includes(m.id) ? { ...m, status: statut } : m));
+      });
     });
 
     return () => {
@@ -90,7 +121,14 @@ export function useChat() {
       deconnecterSocket();
       socketRef.current = null;
     };
-  }, [token]);
+  }, [token, resynchroniser]);
+
+  useEffect(() => {
+    const abonnement = AppState.addEventListener("change", (etat) => {
+      if (etat === "active") resynchroniser();
+    });
+    return () => abonnement.remove();
+  }, [resynchroniser]);
 
   const chargerPlusAnciens = useCallback(async () => {
     if (!token || !conversationId || chargementAncien || toutCharge) return;
@@ -185,8 +223,14 @@ export function useChat() {
           { conversationId, contenu, medias: mediasPayload, idLocal },
           (reponse: any) => {
             if (reponse?.ok) {
+              const statutEnAttente = statutsEnAttenteRef.current.get(reponse.message.id);
+              statutsEnAttenteRef.current.delete(reponse.message.id);
               setMessages((prev) =>
-                prev.map((m) => (m.id === idLocal ? reponse.message : m))
+                prev.map((m) =>
+                  m.id === idLocal
+                    ? { ...reponse.message, status: statutEnAttente ?? reponse.message.status }
+                    : m
+                )
               );
             } else {
               setMessages((prev) =>

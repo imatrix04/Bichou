@@ -180,13 +180,9 @@ interface LigneConversation {
   autre_utilisateur_id: string | null;
   autre_nom_affiche: string | null;
   autre_avatar_url: string | null;
+  autre_derniere_connexion: Date | null;
 }
 
-// GET /messages/conversations/mes — récupère la conversation de l'utilisateur,
-// avec les infos de l'autre participant (nom, avatar) pour l'affichage côté front.
-// LEFT JOIN volontaire : au moment de l'inscription du premier compte, la
-// conversation est créée avant que le second utilisateur n'existe, donc
-// l'autre participant peut être absent temporairement.
 routeurMessages.get("/conversations/mes", authRequise, async (req, res) => {
   try {
     const utilisateurId = req.utilisateur!.utilisateurId;
@@ -195,7 +191,8 @@ routeurMessages.get("/conversations/mes", authRequise, async (req, res) => {
       `SELECT c.id, c.titre, c.cree_le,
               u.id AS autre_utilisateur_id,
               u.nom_affiche AS autre_nom_affiche,
-              u.avatar_url AS autre_avatar_url
+              u.avatar_url AS autre_avatar_url,
+              u.derniere_connexion AS autre_derniere_connexion
        FROM conversation c
        JOIN participation p
          ON p.conversation_id = c.id AND p.utilisateur_id = $1
@@ -215,6 +212,9 @@ routeurMessages.get("/conversations/mes", authRequise, async (req, res) => {
             id: l.autre_utilisateur_id,
             nomAffiche: l.autre_nom_affiche,
             avatarUrl: l.autre_avatar_url,
+            derniereConnexion: l.autre_derniere_connexion
+              ? l.autre_derniere_connexion.toISOString()
+              : null,
           }
         : null,
     }));

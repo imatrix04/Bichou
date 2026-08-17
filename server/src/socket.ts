@@ -90,8 +90,11 @@ export function configurerSocket(io: Server) {
       }
 
       try {
-        const participants = await query<{ utilisateur_id: string }>(
-          `SELECT utilisateur_id FROM participation WHERE conversation_id = $1`,
+        const participants = await query<{ utilisateur_id: string; nom_affiche: string | null }>(
+          `SELECT p.utilisateur_id, u.nom_affiche
+           FROM participation p
+           JOIN utilisateur u ON u.id = p.utilisateur_id
+           WHERE p.conversation_id = $1`,
           [conversationId]
         );
 
@@ -167,6 +170,9 @@ export function configurerSocket(io: Server) {
         callback?.({ ok: true, message: messageApi, idLocal });
         socket.to(`conv:${conversationId}`).emit("message:nouveau", messageApi);
 
+        const expediteur = participants.find((p) => p.utilisateur_id === utilisateurId);
+        const titrePush = expediteur?.nom_affiche || socket.utilisateur!.login;
+
         for (const dest of participants) {
           if (dest.utilisateur_id === utilisateurId) continue;
           if (estConnecte(dest.utilisateur_id)) continue;
@@ -174,7 +180,7 @@ export function configurerSocket(io: Server) {
           const apercu = texte || (listeMedias.length > 0 ? "Nouvelle photo" : "Nouveau message");
           envoyerPushMessage(
             dest.utilisateur_id,
-            socket.utilisateur!.login,
+            titrePush,
             apercu,
             { conversationId }
           ).catch((err) => console.error("Erreur push :", err));
@@ -225,6 +231,10 @@ export function configurerSocket(io: Server) {
         sockets?.delete(socket.id);
         if (sockets && sockets.size === 0) {
           utilisateursConnectes.delete(utilisateurId);
+          query(
+            `UPDATE utilisateur SET derniere_connexion = NOW() WHERE id = $1`,
+            [utilisateurId]
+          ).catch((err) => console.error("Erreur maj derniere_connexion :", err));
         }
 
       // Coupe l'indicateur de frappe resté actif

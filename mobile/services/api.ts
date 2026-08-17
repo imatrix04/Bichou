@@ -29,6 +29,7 @@ export interface AutreUtilisateurApi {
   id: string;
   nomAffiche: string;
   avatarUrl: string | null;
+  derniereConnexion: string | null;
 }
 
 export interface ConversationApi {

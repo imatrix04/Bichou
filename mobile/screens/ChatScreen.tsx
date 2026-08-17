@@ -45,9 +45,16 @@ export default function ChatScreen() {
     envoyerMessage, marquerCommeLus, signalerFrappe, chargerPlusAnciens,
   } = useChat();
 
-  // Le partenaire peut ne pas encore avoir de compte juste après l'inscription
-  // (la conversation est créée avant le second compte) — on garde "Bichou"
-  // comme repli le temps que ça se connecte.
+
+  function formatDerniereConnexion(iso: string): string {
+    const date = new Date(iso);
+    const maintenant = new Date();
+    const memejour = date.toDateString() === maintenant.toDateString();
+    const heure = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (memejour) return `vue à ${heure}`;
+    return `vue le ${date.toLocaleDateString([], { day: "2-digit", month: "2-digit" })} à ${heure}`;
+  }
+
   const nomEnTete = autreUtilisateur?.nomAffiche ?? "Bichou";
 
   const [draft, setDraft] = useState("");
@@ -62,13 +69,15 @@ export default function ChatScreen() {
     if (!chargement) marquerCommeLus();
   }, [chargement, messages.length, marquerCommeLus]);
 
-  // Scroll automatique en bas à chaque nouveau message (liste inversée,
-  // donc offset 0 = bas de l'écran)
+  const dernierIdEnTeteRef = useRef<string | null>(null);
   useEffect(() => {
-    if (messages.length > 0) {
-      listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    const idEnTete = messages[0]?.id ?? null;
+    if (idEnTete && idEnTete !== dernierIdEnTeteRef.current) {
+      const premierRendu = dernierIdEnTeteRef.current === null;
+      dernierIdEnTeteRef.current = idEnTete;
+      listRef.current?.scrollToOffset({ offset: 0, animated: !premierRendu });
     }
-  }, [messages.length]);
+  }, [messages]);
 
   const toggleAttachOptions = useCallback(() => {
     setShowAttachOptions((prev) => !prev);
@@ -104,7 +113,11 @@ export default function ChatScreen() {
           <Text style={[styles.headerTitle, { color: colors.text }]}>{nomEnTete}</Text>
           <Ionicons name="heart" size={14} color={ROSE.gold} style={styles.headerHeart} />
           {!connecte && (
-            <Text style={[styles.headerStatus, { color: colors.textSecondary }]}>hors ligne</Text>
+            <Text style={[styles.headerStatus, { color: colors.textSecondary }]}>
+              {autreUtilisateur?.derniereConnexion
+                ? formatDerniereConnexion(autreUtilisateur.derniereConnexion)
+                : "hors ligne"}
+            </Text>
           )}
         </View>
         <TouchableOpacity onPress={seDeconnecter}>
