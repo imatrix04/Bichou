@@ -21,6 +21,34 @@ const ROSE = {
   goldDeep: "#9C5B66",
 };
 
+
+function renderTexteAvecGras(texte: string, baseStyle: any, isOwnMessage: boolean) {
+  const parties = texte.split(/(\*\*[^*]+\*\*)/g);
+  return parties.map((partie, i) => {
+    if (partie.startsWith("**") && partie.endsWith("**")) {
+      return (
+        <Text
+          key={i}
+          style={[
+            baseStyle,
+            {
+              fontWeight: "700",
+              color: isOwnMessage ? "#FDE8D8" : ROSE.goldDeep,
+            },
+          ]}
+        >
+          {partie.slice(2, -2)}
+        </Text>
+      );
+    }
+    return partie ? (
+      <Text key={i} style={baseStyle}>
+        {partie}
+      </Text>
+    ) : null;
+  });
+}
+
 function StatusIcon({ status, colors }: { status: ChatMessage["status"]; colors: ReturnType<typeof useAppTheme>["colors"] }) {
   switch (status) {
     case "sending":
@@ -30,10 +58,6 @@ function StatusIcon({ status, colors }: { status: ChatMessage["status"]; colors:
     case "delivered":
       return <Ionicons name="checkmark-done" size={14} color={colors.statusDefault} />;
     case "read":
-      // Touche romantique : un message lu devient un petit cœur plein
-      // plutôt qu'un double-check classique. On garde la même teinte que
-      // les autres icônes du footer (blanc translucide) car ROSE.gold —
-      // la couleur de la bulle elle-même — rendait le cœur invisible.
       return <Ionicons name="heart" size={13} color={colors.statusDefault} />;
     case "failed":
       return <Ionicons name="alert-circle" size={14} color={colors.statusFailed} />;
@@ -90,7 +114,7 @@ export default function MessageBubble({ message, isOwnMessage, onMediaPress }: P
 
         {message.text ? (
           <Text style={[styles.text, { color: isOwnMessage ? "#FFFFFF" : colors.textOther }]}>
-            {message.text}
+            {renderTexteAvecGras(message.text, [styles.text, { color: isOwnMessage ? "#FFFFFF" : colors.textOther }], isOwnMessage)}
           </Text>
         ) : null}
 
