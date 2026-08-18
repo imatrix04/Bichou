@@ -91,9 +91,12 @@ export function useChat() {
       });
       socket.on("disconnect", () => setConnecte(false));
 
-      socket.on("presence:maj", ({ utilisateurId, enLigne }: { utilisateurId: string; enLigne: boolean }) => {
+      socket.on("presence:maj", ({ utilisateurId, enLigne, derniereConnexion }: { utilisateurId: string; enLigne: boolean; derniereConnexion?: string | null }) => {
         if (utilisateurId === autreUtilisateurIdRef.current) {
           setAutreEnLigne(enLigne);
+          if (!enLigne && derniereConnexion) {
+            setAutreUtilisateur((prev) => (prev ? { ...prev, derniereConnexion } : prev));
+          }
         }
       });
 

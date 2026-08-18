@@ -77,15 +77,18 @@ export function configurerSocket(io: Server) {
       }
 
       // On informe ce socket du statut actuel de l'autre participant
-      const autresParticipants = await query<{ utilisateur_id: string }>(
-        `SELECT DISTINCT utilisateur_id FROM participation
-         WHERE conversation_id = ANY($1::uuid[]) AND utilisateur_id != $2`,
+      const autresParticipants = await query<{ utilisateur_id: string; derniere_connexion: Date | null }>(
+        `SELECT DISTINCT p.utilisateur_id, u.derniere_connexion
+         FROM participation p
+         JOIN utilisateur u ON u.id = p.utilisateur_id
+         WHERE p.conversation_id = ANY($1::uuid[]) AND p.utilisateur_id != $2`,
         [conversations.map((c) => c.conversation_id), utilisateurId]
       );
-      for (const { utilisateur_id } of autresParticipants) {
+      for (const { utilisateur_id, derniere_connexion } of autresParticipants) {
         socket.emit("presence:maj", {
           utilisateurId: utilisateur_id,
           enLigne: estConnecte(utilisateur_id),
+          derniereConnexion: derniere_connexion ? derniere_connexion.toISOString() : null,
         });
       }
     } catch (err) {
@@ -249,18 +252,27 @@ export function configurerSocket(io: Server) {
       });
     });
 
-    socket.on("disconnect", async (raison) => {
+        socket.on("disconnect", async (raison) => {
       console.log(`Déconnecté : ${socket.utilisateur!.login} (${raison})`);
 
         const sockets = utilisateursConnectes.get(utilisateurId);
         sockets?.delete(socket.id);
         const devientHorsLigne = !!sockets && sockets.size === 0;
+        let derniereConnexion: string | null = null;
+
         if (devientHorsLigne) {
           utilisateursConnectes.delete(utilisateurId);
-          query(
-            `UPDATE utilisateur SET derniere_connexion = NOW() WHERE id = $1`,
-            [utilisateurId]
-          ).catch((err) => console.error("Erreur maj derniere_connexion :", err));
+          try {
+            const lignes = await query<{ derniere_connexion: Date }>(
+              `UPDATE utilisateur SET derniere_connexion = NOW()
+               WHERE id = $1
+               RETURNING derniere_connexion`,
+              [utilisateurId]
+            );
+            derniereConnexion = lignes[0]?.derniere_connexion.toISOString() ?? null;
+          } catch (err) {
+            console.error("Erreur maj derniere_connexion :", err);
+          }
         }
 
       const conversations = await query<{ conversation_id: string }>(
@@ -277,6 +289,7 @@ export function configurerSocket(io: Server) {
           socket.to(`conv:${conversation_id}`).emit("presence:maj", {
             utilisateurId,
             enLigne: false,
+            derniereConnexion,
           });
         }
       }
