@@ -41,7 +41,7 @@ export default function ChatScreen() {
   const { colors, isDark } = useAppTheme();
   const { utilisateur, seDeconnecter } = useAuth();
   const {
-    messages, chargement, chargementAncien, toutCharge, connecte, autreUtilisateur, enTrainDEcrire,
+    messages, chargement, chargementAncien, toutCharge, connecte, autreUtilisateur, autreEnLigne, enTrainDEcrire,
     envoyerMessage, marquerCommeLus, signalerFrappe, chargerPlusAnciens,
   } = useChat();
 
@@ -112,7 +112,7 @@ export default function ChatScreen() {
         <View style={styles.headerTitleRow}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{nomEnTete}</Text>
           <Ionicons name="heart" size={14} color={ROSE.gold} style={styles.headerHeart} />
-          {!connecte && (
+          {!autreEnLigne && (
             <Text style={[styles.headerStatus, { color: colors.textSecondary }]}>
               {autreUtilisateur?.derniereConnexion
                 ? formatDerniereConnexion(autreUtilisateur.derniereConnexion)

@@ -47,6 +47,8 @@ export function configurerSocket(io: Server) {
   io.on("connection", async (socket: SocketAuthentifie) => {
     const utilisateurId = socket.utilisateur!.utilisateurId;
     console.log(`Connecté : ${socket.utilisateur!.login}`);
+
+    const etaitDejaConnecte = estConnecte(utilisateurId);
     
     if (!utilisateursConnectes.has(utilisateurId)) {
       utilisateursConnectes.set(utilisateurId, new Set());
@@ -62,6 +64,29 @@ export function configurerSocket(io: Server) {
 
       for (const { conversation_id } of conversations) {
         socket.join(`conv:${conversation_id}`);
+      }
+
+      // On ne diffuse "en ligne" qu'au premier device connecté de cet utilisateur
+      if (!etaitDejaConnecte) {
+        for (const { conversation_id } of conversations) {
+          socket.to(`conv:${conversation_id}`).emit("presence:maj", {
+            utilisateurId,
+            enLigne: true,
+          });
+        }
+      }
+
+      // On informe ce socket du statut actuel de l'autre participant
+      const autresParticipants = await query<{ utilisateur_id: string }>(
+        `SELECT DISTINCT utilisateur_id FROM participation
+         WHERE conversation_id = ANY($1::uuid[]) AND utilisateur_id != $2`,
+        [conversations.map((c) => c.conversation_id), utilisateurId]
+      );
+      for (const { utilisateur_id } of autresParticipants) {
+        socket.emit("presence:maj", {
+          utilisateurId: utilisateur_id,
+          enLigne: estConnecte(utilisateur_id),
+        });
       }
     } catch (err) {
       console.error("Erreur rooms :", err);
@@ -229,7 +254,8 @@ export function configurerSocket(io: Server) {
 
         const sockets = utilisateursConnectes.get(utilisateurId);
         sockets?.delete(socket.id);
-        if (sockets && sockets.size === 0) {
+        const devientHorsLigne = !!sockets && sockets.size === 0;
+        if (devientHorsLigne) {
           utilisateursConnectes.delete(utilisateurId);
           query(
             `UPDATE utilisateur SET derniere_connexion = NOW() WHERE id = $1`,
@@ -237,7 +263,6 @@ export function configurerSocket(io: Server) {
           ).catch((err) => console.error("Erreur maj derniere_connexion :", err));
         }
 
-      // Coupe l'indicateur de frappe resté actif
       const conversations = await query<{ conversation_id: string }>(
         `SELECT conversation_id FROM participation WHERE utilisateur_id = $1`,
         [utilisateurId]
@@ -248,7 +273,12 @@ export function configurerSocket(io: Server) {
           utilisateurId,
           actif: false,
         });
+        if (devientHorsLigne) {
+          socket.to(`conv:${conversation_id}`).emit("presence:maj", {
+            utilisateurId,
+            enLigne: false,
+          });
+        }
       }
     });
-  });
-}
+})}

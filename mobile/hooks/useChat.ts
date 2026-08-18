@@ -20,16 +20,14 @@ export function useChat() {
   const [chargementAncien, setChargementAncien] = useState(false);
   const [toutCharge, setToutCharge] = useState(false);
   const [connecte, setConnecte] = useState(false);
+  const [autreEnLigne, setAutreEnLigne] = useState(false);
   const [enTrainDEcrire, setEnTrainDEcrire] = useState(false);
   const timerFrappeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const socketRef = useRef<ReturnType<typeof connecterSocket> | null>(null);
 
   const statutsEnAttenteRef = useRef<Map<string, ChatMessage["status"]>>(new Map());
   const conversationIdRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    conversationIdRef.current = conversationId;
-  }, [conversationId]);
+  const autreUtilisateurIdRef = useRef<string | null>(null);
 
   const resynchroniser = useCallback(async () => {
     const convId = conversationIdRef.current;
@@ -47,11 +45,15 @@ export function useChat() {
     }
   }, [token]);
 
-  // Chargement initial : conversation + historique
+  // Chargement initial (conversation + historique), PUIS connexion WebSocket.
+  // On attend d'avoir chargé autreUtilisateur avant d'ouvrir le socket, pour
+  // que autreUtilisateurIdRef soit déjà renseigné quand le serveur nous
+  // envoie l'état de présence initial — pas de race condition possible.
   useEffect(() => {
     if (!token) return;
 
     let annule = false;
+    let socket: ReturnType<typeof connecterSocket> | null = null;
 
     (async () => {
       try {
@@ -62,6 +64,10 @@ export function useChat() {
         const historique = await recupererMessages(token, conv.id, undefined, 20);
 
         if (annule) return;
+
+        conversationIdRef.current = conv.id;
+        autreUtilisateurIdRef.current = conv.autreUtilisateur?.id ?? null;
+
         setConversationId(conv.id);
         setAutreUtilisateur(conv.autreUtilisateur);
         // Liste inversée : le plus récent en premier
@@ -71,54 +77,59 @@ export function useChat() {
       } finally {
         if (!annule) setChargement(false);
       }
+
+      if (annule) return;
+
+      // autreUtilisateurIdRef est déjà à jour à ce stade (ou null s'il n'y
+      // a pas de conversation / pas d'autre participant).
+      socket = connecterSocket(token);
+      socketRef.current = socket;
+
+      socket.on("connect", () => {
+        setConnecte(true);
+        resynchroniser();
+      });
+      socket.on("disconnect", () => setConnecte(false));
+
+      socket.on("presence:maj", ({ utilisateurId, enLigne }: { utilisateurId: string; enLigne: boolean }) => {
+        if (utilisateurId === autreUtilisateurIdRef.current) {
+          setAutreEnLigne(enLigne);
+        }
+      });
+
+      socket.on("frappe", ({ actif }: { actif: boolean }) => {
+        setEnTrainDEcrire(actif);
+      });
+
+      socket.on("message:nouveau", (message: ChatMessage) => {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === message.id)) return prev;
+          return [message, ...prev];
+        });
+      });
+
+      socket.on("message:statut", ({ messageIds, statut }) => {
+        setMessages((prev) => {
+          const idsPresents = new Set(prev.map((m) => m.id));
+          for (const id of messageIds as string[]) {
+            if (!idsPresents.has(id)) statutsEnAttenteRef.current.set(id, statut);
+          }
+          return prev.map((m) => (messageIds.includes(m.id) ? { ...m, status: statut } : m));
+        });
+      });
     })();
 
     return () => {
       annule = true;
-    };
-  }, [token]);
-
-  // Connexion WebSocket
-  useEffect(() => {
-    if (!token) return;
-
-    const socket = connecterSocket(token);
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      setConnecte(true);
-      resynchroniser();
-    });
-    socket.on("disconnect", () => setConnecte(false));
-
-    socket.on("frappe", ({ actif }: { actif: boolean }) => {
-      setEnTrainDEcrire(actif);
-    });
-
-    socket.on("message:nouveau", (message: ChatMessage) => {
-      setMessages((prev) => {
-        if (prev.some((m) => m.id === message.id)) return prev;
-        return [message, ...prev];
-      });
-    });
-
-    socket.on("message:statut", ({ messageIds, statut }) => {
-      setMessages((prev) => {
-        const idsPresents = new Set(prev.map((m) => m.id));
-        for (const id of messageIds as string[]) {
-          if (!idsPresents.has(id)) statutsEnAttenteRef.current.set(id, statut);
-        }
-        return prev.map((m) => (messageIds.includes(m.id) ? { ...m, status: statut } : m));
-      });
-    });
-
-    return () => {
-      socket.off("connect");
-      socket.off("disconnect");
-      socket.off("message:nouveau");
-      socket.off("message:statut");
-      socket.off("frappe");
-      deconnecterSocket();
+      if (socket) {
+        socket.off("connect");
+        socket.off("disconnect");
+        socket.off("presence:maj");
+        socket.off("message:nouveau");
+        socket.off("message:statut");
+        socket.off("frappe");
+        deconnecterSocket();
+      }
       socketRef.current = null;
     };
   }, [token, resynchroniser]);
@@ -269,6 +280,7 @@ export function useChat() {
     chargementAncien,
     toutCharge,
     connecte,
+    autreEnLigne,
     conversationId,
     autreUtilisateur,
     enTrainDEcrire,
