@@ -32,9 +32,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "backgroundColor": "#F7E1E4",
+          "image": "./assets/images/logo-bichou-splash.png",
+          "imageWidth": 140
         }
       ],
       [
@@ -42,6 +42,13 @@
         {
           "photosPermission": "Bichou a besoin d'accéder à tes photos pour les partager dans le chat.",
           "cameraPermission": "Bichou a besoin de la caméra pour prendre une photo à partager."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Bichou a besoin d'accéder à tes photos pour enregistrer les images reçues.",
+          "savePhotosPermission": "Bichou veut enregistrer cette image dans ta galerie."
         }
       ],
       "expo-secure-store",
@@ -52,7 +59,8 @@
           "color": "#4F7CFF"
         }
       ],
-      "expo-image"
+      "expo-image",
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

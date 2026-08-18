@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Text,
   Modal,
+  Alert,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
@@ -21,7 +22,7 @@ import { useChat } from "../hooks/useChat";
 import { useAppTheme } from "../hooks/useAppTheme";
 import MessageBubble from "../components/MessageBubble";
 import { ChatMessage, MediaAttachment } from "../types/chat";
-import { pickFromCamera, pickFromLibrary } from "../utils/mediaPicker";
+import { pickFromCamera, pickFromLibrary, enregistrerImageDansGalerie } from "../utils/mediaPicker";
 import { urlComplete } from "../services/api";
 
 // Palette romantique rose poudré / rose gold — pensée comme un accent
@@ -60,6 +61,7 @@ export default function ChatScreen() {
   const [draft, setDraft] = useState("");
   const [pendingMedia, setPendingMedia] = useState<MediaAttachment | null>(null);
   const [viewerMedia, setViewerMedia] = useState<{ uri: string; width?: number; height?: number } | null>(null);
+  const [enregistrement, setEnregistrement] = useState(false);
   const [showAttachOptions, setShowAttachOptions] = useState(false);
   const listRef = useRef<FlatList<ChatMessage>>(null);
 
@@ -282,6 +284,25 @@ export default function ChatScreen() {
               />
             </View>
           )}
+
+          <TouchableOpacity
+            style={styles.viewerSaveButton}
+            disabled={enregistrement}
+            onPress={async (e) => {
+              e.stopPropagation();
+              if (!viewerMedia) return;
+              setEnregistrement(true);
+              const ok = await enregistrerImageDansGalerie(viewerMedia.uri);
+              setEnregistrement(false);
+              Alert.alert(ok ? "Image enregistrée" : "Échec de l'enregistrement");
+            }}
+          >
+            {enregistrement ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Ionicons name="download-outline" size={22} color="#FFFFFF" />
+            )}
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
     </SafeAreaView>
@@ -442,5 +463,13 @@ const styles = StyleSheet.create({
   viewerImage: {
     width: "100%",
     height: "100%",
+  },
+    viewerSaveButton: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    borderRadius: 20,
+    padding: 10,
   },
 });

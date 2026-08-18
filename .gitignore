@@ -51,5 +51,6 @@ contexte-projet-couplapp.md
 # generated native folders
 /ios
 /android
+android/
 
 RAPPORT-BUG-STATUT-LU.md

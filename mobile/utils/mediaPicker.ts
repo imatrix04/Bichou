@@ -1,5 +1,7 @@
 // utils/mediaPicker.ts
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import * as MediaLibrary from "expo-media-library";
 import { MediaAttachment, MediaType } from "../types/chat";
 
 function toMediaAttachment(asset: ImagePicker.ImagePickerAsset): MediaAttachment {
@@ -15,10 +17,6 @@ function toMediaAttachment(asset: ImagePicker.ImagePickerAsset): MediaAttachment
   };
 }
 
-/**
- * Ouvre la galerie et laisse choisir une photo ou vidéo.
- * Retourne null si l'utilisateur annule ou refuse la permission.
- */
 export async function pickFromLibrary(): Promise<MediaAttachment | null> {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (status !== "granted") {
@@ -38,10 +36,6 @@ export async function pickFromLibrary(): Promise<MediaAttachment | null> {
   return toMediaAttachment(result.assets[0]);
 }
 
-/**
- * Ouvre la caméra pour prendre une photo directement.
- * Retourne null si l'utilisateur annule ou refuse la permission.
- */
 export async function pickFromCamera(): Promise<MediaAttachment | null> {
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
   if (status !== "granted") {
@@ -58,4 +52,19 @@ export async function pickFromCamera(): Promise<MediaAttachment | null> {
   }
 
   return toMediaAttachment(result.assets[0]);
+}
+
+export async function enregistrerImageDansGalerie(uri: string): Promise<boolean> {
+  const { status } = await MediaLibrary.requestPermissionsAsync();
+  if (status !== "granted") {
+    return false;
+  }
+
+  const nomFichier = uri.split("/").pop()?.split("?")[0] ?? `bichou-${Date.now()}.jpg`;
+  const cheminLocal = FileSystem.cacheDirectory + nomFichier;
+
+  const { uri: uriTelechargee } = await FileSystem.downloadAsync(uri, cheminLocal);
+  await MediaLibrary.saveToLibraryAsync(uriTelechargee);
+
+  return true;
 }
