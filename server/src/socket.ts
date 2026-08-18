@@ -55,56 +55,13 @@ export function configurerSocket(io: Server) {
     }
     utilisateursConnectes.get(utilisateurId)!.add(socket.id);
 
-    // L'utilisateur rejoint une room par conversation à laquelle il participe
-    try {
-      const conversations = await query<{ conversation_id: string }>(
-        `SELECT conversation_id FROM participation WHERE utilisateur_id = $1`,
-        [utilisateurId]
-      );
-
-      for (const { conversation_id } of conversations) {
-        socket.join(`conv:${conversation_id}`);
-      }
-
-      // On ne diffuse "en ligne" qu'au premier device connecté de cet utilisateur
-      if (!etaitDejaConnecte) {
-        for (const { conversation_id } of conversations) {
-          socket.to(`conv:${conversation_id}`).emit("presence:maj", {
-            utilisateurId,
-            enLigne: true,
-          });
-        }
-      }
-
-      // On informe ce socket du statut actuel de l'autre participant
-      const autresParticipants = await query<{ utilisateur_id: string; derniere_connexion: Date | null }>(
-        `SELECT DISTINCT p.utilisateur_id, u.derniere_connexion
-         FROM participation p
-         JOIN utilisateur u ON u.id = p.utilisateur_id
-         WHERE p.conversation_id = ANY($1::uuid[]) AND p.utilisateur_id != $2`,
-        [conversations.map((c) => c.conversation_id), utilisateurId]
-      );
-      for (const { utilisateur_id, derniere_connexion } of autresParticipants) {
-        socket.emit("presence:maj", {
-          utilisateurId: utilisateur_id,
-          enLigne: estConnecte(utilisateur_id),
-          derniereConnexion: derniere_connexion ? derniere_connexion.toISOString() : null,
-        });
-      }
-    } catch (err) {
-      console.error("Erreur rooms :", err);
-    }
-
-    // Tout ce qui était en attente passe à "remis"
-    try {
-      await query(
-        `UPDATE statut_lecture SET remis_le = NOW()
-         WHERE utilisateur_id = $1 AND remis_le IS NULL`,
-        [utilisateurId]
-      );
-    } catch (err) {
-      console.error("Erreur marquage remis :", err);
-    }
+    // IMPORTANT : les listeners doivent être attachés AVANT tout `await`.
+    // Le client reçoit "connect" (et peut donc émettre "message:lu" etc.)
+    // dès la poignée de main établie, alors que le serveur, lui, ne
+    // termine ses requêtes de préparation (rooms, présence, remis_le)
+    // qu'après plusieurs allers-retours DB. Un event émis par le client
+    // dans cette fenêtre arrivait sur un socket sans handler enregistré
+    // et était silencieusement perdu (pas d'erreur, pas d'ack).
 
     // Envoi d'un message (texte et/ou médias)
     socket.on("message:envoyer", async (donnees, callback) => {
@@ -221,16 +178,20 @@ export function configurerSocket(io: Server) {
     });
 
     // Marquer des messages comme lus
-    socket.on("message:lu", async (donnees) => {
+    socket.on("message:lu", async (donnees, callback) => {
       const { conversationId, messageIds } = donnees ?? {};
 
-      if (!Array.isArray(messageIds) || messageIds.length === 0) return;
+      if (!Array.isArray(messageIds) || messageIds.length === 0) {
+        callback?.({ ok: false, erreur: "messageIds invalide" });
+        return;
+      }
 
       try {
-        await query(
+        const misAJour = await query(
           `UPDATE statut_lecture
            SET lu_le = NOW(), remis_le = COALESCE(remis_le, NOW())
-           WHERE utilisateur_id = $1 AND message_id = ANY($2::uuid[]) AND lu_le IS NULL`,
+           WHERE utilisateur_id = $1 AND message_id = ANY($2::uuid[]) AND lu_le IS NULL
+           RETURNING message_id`,
           [utilisateurId, messageIds]
         );
 
@@ -239,8 +200,10 @@ export function configurerSocket(io: Server) {
           messageIds,
           statut: "read",
         });
+        callback?.({ ok: true, misAJour: misAJour.length });
       } catch (err) {
         console.error("Erreur marquage lu :", err);
+        callback?.({ ok: false, erreur: "Erreur serveur" });
       }
     });
 
@@ -251,6 +214,57 @@ export function configurerSocket(io: Server) {
         actif: Boolean(actif),
       });
     });
+
+    // L'utilisateur rejoint une room par conversation à laquelle il participe
+    try {
+      const conversations = await query<{ conversation_id: string }>(
+        `SELECT conversation_id FROM participation WHERE utilisateur_id = $1`,
+        [utilisateurId]
+      );
+
+      for (const { conversation_id } of conversations) {
+        socket.join(`conv:${conversation_id}`);
+      }
+
+      // On ne diffuse "en ligne" qu'au premier device connecté de cet utilisateur
+      if (!etaitDejaConnecte) {
+        for (const { conversation_id } of conversations) {
+          socket.to(`conv:${conversation_id}`).emit("presence:maj", {
+            utilisateurId,
+            enLigne: true,
+          });
+        }
+      }
+
+      // On informe ce socket du statut actuel de l'autre participant
+      const autresParticipants = await query<{ utilisateur_id: string; derniere_connexion: Date | null }>(
+        `SELECT DISTINCT p.utilisateur_id, u.derniere_connexion
+         FROM participation p
+         JOIN utilisateur u ON u.id = p.utilisateur_id
+         WHERE p.conversation_id = ANY($1::uuid[]) AND p.utilisateur_id != $2`,
+        [conversations.map((c) => c.conversation_id), utilisateurId]
+      );
+      for (const { utilisateur_id, derniere_connexion } of autresParticipants) {
+        socket.emit("presence:maj", {
+          utilisateurId: utilisateur_id,
+          enLigne: estConnecte(utilisateur_id),
+          derniereConnexion: derniere_connexion ? derniere_connexion.toISOString() : null,
+        });
+      }
+    } catch (err) {
+      console.error("Erreur rooms :", err);
+    }
+
+    // Tout ce qui était en attente passe à "remis"
+    try {
+      await query(
+        `UPDATE statut_lecture SET remis_le = NOW()
+         WHERE utilisateur_id = $1 AND remis_le IS NULL`,
+        [utilisateurId]
+      );
+    } catch (err) {
+      console.error("Erreur marquage remis :", err);
+    }
 
         socket.on("disconnect", async (raison) => {
       console.log(`Déconnecté : ${socket.utilisateur!.login} (${raison})`);

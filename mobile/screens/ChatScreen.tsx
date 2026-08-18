@@ -67,7 +67,7 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (!chargement) marquerCommeLus();
-  }, [chargement, messages.length, marquerCommeLus]);
+  }, [chargement, connecte, messages.length, marquerCommeLus]);
 
   const dernierIdEnTeteRef = useRef<string | null>(null);
   useEffect(() => {

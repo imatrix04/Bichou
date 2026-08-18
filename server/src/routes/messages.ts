@@ -20,18 +20,7 @@ interface LigneMessage {
 
 // Transforme une ligne SQL en objet conforme au type ChatMessage du front
 function versMessageApi(ligne: LigneMessage, utilisateurCourantId: string) {
-  const estAMoi = ligne.expediteur_id === utilisateurCourantId;
-
-  let statut: string;
-  if (!estAMoi) {
-    statut = "read";
-  } else if (ligne.lu_le) {
-    statut = "read";
-  } else if (ligne.remis_le) {
-    statut = "delivered";
-  } else {
-    statut = "sent";
-  }
+  const statut = ligne.lu_le ? "read" : ligne.remis_le ? "delivered" : "sent";
 
   const medias = Array.isArray(ligne.medias) && ligne.medias.length > 0
     ? (ligne.medias as any[]).map((m) => ({

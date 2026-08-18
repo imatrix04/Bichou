@@ -31,8 +31,10 @@ function StatusIcon({ status, colors }: { status: ChatMessage["status"]; colors:
       return <Ionicons name="checkmark-done" size={14} color={colors.statusDefault} />;
     case "read":
       // Touche romantique : un message lu devient un petit cœur plein
-      // plutôt qu'un double-check classique.
-      return <Ionicons name="heart" size={13} color={ROSE.gold} />;
+      // plutôt qu'un double-check classique. On garde la même teinte que
+      // les autres icônes du footer (blanc translucide) car ROSE.gold —
+      // la couleur de la bulle elle-même — rendait le cœur invisible.
+      return <Ionicons name="heart" size={13} color={colors.statusDefault} />;
     case "failed":
       return <Ionicons name="alert-circle" size={14} color={colors.statusFailed} />;
     default:
