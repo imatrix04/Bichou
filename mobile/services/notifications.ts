@@ -37,3 +37,12 @@ export async function enregistrerPourNotifications(): Promise<string | null> {
   const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
   return token;
 }
+
+export async function viderNotifications(): Promise<void> {
+  if (Platform.OS === "web") return;
+  if (Constants.appOwnership === "expo") return;
+
+  const Notifications = await import("expo-notifications");
+  await Notifications.dismissAllNotificationsAsync();
+  await Notifications.setBadgeCountAsync(0);
+}

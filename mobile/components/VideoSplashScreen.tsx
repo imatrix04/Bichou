@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, TouchableOpacity } from "react-native";
+import { StyleSheet, TouchableOpacity, View } from "react-native";
 import { useVideoPlayer, VideoView } from "expo-video";
 
 interface Props {
@@ -10,6 +10,8 @@ export default function VideoSplashScreen({ onFinish }: Props) {
   const player = useVideoPlayer(
     require("../assets/videos/splash-bichou.mp4"),
     (p) => {
+      p.muted = true;
+      p.audioMixingMode = "mixWithOthers";
       p.play();
     }
   );
@@ -22,18 +24,19 @@ export default function VideoSplashScreen({ onFinish }: Props) {
   }, [player, onFinish]);
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      activeOpacity={1}
-      onPress={onFinish}
-    >
+    <View style={styles.container}>
       <VideoView
         player={player}
         style={styles.video}
         contentFit="cover"
         nativeControls={false}
       />
-    </TouchableOpacity>
+      <TouchableOpacity
+        style={StyleSheet.absoluteFill}
+        activeOpacity={1}
+        onPress={onFinish}
+      />
+    </View>
   );
 }
 

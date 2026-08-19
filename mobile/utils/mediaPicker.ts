@@ -1,7 +1,7 @@
 // utils/mediaPicker.ts
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
-import * as MediaLibrary from "expo-media-library";
+import * as MediaLibrary from "expo-media-library/legacy";
 import { MediaAttachment, MediaType } from "../types/chat";
 
 function toMediaAttachment(asset: ImagePicker.ImagePickerAsset): MediaAttachment {

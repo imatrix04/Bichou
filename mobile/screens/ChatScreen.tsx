@@ -113,8 +113,13 @@ export default function ChatScreen() {
       <View style={[styles.header, { borderBottomColor: ROSE.gold }]}>
         <View style={styles.headerTitleRow}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{nomEnTete}</Text>
-          <Ionicons name="heart" size={14} color={ROSE.gold} style={styles.headerHeart} />
-          {!autreEnLigne && (
+                    <Ionicons name="heart" size={14} color={ROSE.gold} style={styles.headerHeart} />
+          {autreEnLigne ? (
+            <View style={styles.headerStatusRow}>
+              <View style={styles.pointEnLigne} />
+              <Text style={[styles.headerStatus, { color: ROSE.goldDeep }]}>en ligne</Text>
+            </View>
+          ) : (
             <Text style={[styles.headerStatus, { color: colors.textSecondary }]}>
               {autreUtilisateur?.derniereConnexion
                 ? formatDerniereConnexion(autreUtilisateur.derniereConnexion)
@@ -292,9 +297,16 @@ export default function ChatScreen() {
               e.stopPropagation();
               if (!viewerMedia) return;
               setEnregistrement(true);
-              const ok = await enregistrerImageDansGalerie(viewerMedia.uri);
-              setEnregistrement(false);
-              Alert.alert(ok ? "Image enregistrée" : "Échec de l'enregistrement");
+              try {
+                const ok = await enregistrerImageDansGalerie(viewerMedia.uri);
+                Alert.alert(ok ? "Image enregistrée" : "Échec de l'enregistrement");
+              } catch (err) {
+                console.error("Erreur enregistrement image :", err);
+                const message = err instanceof Error ? err.message : String(err);
+                Alert.alert("Erreur", `Impossible d'enregistrer l'image.\n${message}`);
+              } finally {
+                setEnregistrement(false);
+              }
             }}
           >
             {enregistrement ? (
@@ -345,6 +357,17 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 12,
     fontStyle: "italic",
+  },
+    headerStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  pointEnLigne: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#4CAF50",
+    marginRight: 5,
   },
   listContent: {
     paddingVertical: 14,
