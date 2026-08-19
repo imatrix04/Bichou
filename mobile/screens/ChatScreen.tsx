@@ -24,19 +24,9 @@ import MessageBubble from "../components/MessageBubble";
 import { ChatMessage, MediaAttachment } from "../types/chat";
 import { pickFromCamera, pickFromLibrary, enregistrerImageDansGalerie } from "../utils/mediaPicker";
 import { urlComplete } from "../services/api";
+import { ACCENTS, ACCENT_ACTIF } from "../theme/accents";
 
-// Palette romantique rose poudré / rose gold — pensée comme un accent
-// posé par-dessus le thème clair/sombre existant (colors.*), pas en
-// remplacement des couleurs fonctionnelles (fond, texte).
-// Si tu veux la rendre réutilisable ailleurs, ça peut migrer dans
-// useAppTheme.ts plus tard.
-const ROSE = {
-  blush: "#F7E1E4", // rose très clair, pour les puces/chips
-  blushDark: "#3A2C30", // équivalent sombre du blush pour le dark mode
-  petal: "#F2C6CC", // rose doux, bordures
-  gold: "#C08A94", // rose gold principal
-  goldDeep: "#9C5B66", // rose gold plus soutenu (texte, icônes actives)
-};
+const ROSE = ACCENTS[ACCENT_ACTIF];
 
 export default function ChatScreen() {
   const { colors, isDark } = useAppTheme();

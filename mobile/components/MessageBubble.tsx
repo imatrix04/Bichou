@@ -1,26 +1,21 @@
 // components/MessageBubble.tsx
-import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import { ChatMessage } from "../types/chat";
 import { useAppTheme } from "../hooks/useAppTheme";
-
 import { urlComplete } from "../services/api";
+import { ACCENTS, ACCENT_ACTIF } from "../theme/accents";
+import { parserCommande } from "../utils/commandes";
+
+const ROSE = ACCENTS[ACCENT_ACTIF];
 
 interface Props {
   message: ChatMessage;
   isOwnMessage: boolean;
   onMediaPress?: (uri: string) => void;
 }
-
-// Même palette rose gold que ChatScreen.tsx — à terme, ça peut migrer
-// dans useAppTheme.ts pour être partagé sans duplication.
-const ROSE = {
-  gold: "#C08A94",
-  goldDeep: "#9C5B66",
-};
-
 
 function renderTexteAvecGras(texte: string, baseStyle: any, isOwnMessage: boolean) {
   const parties = texte.split(/(\*\*[^*]+\*\*)/g);
@@ -66,23 +61,69 @@ function StatusIcon({ status, colors }: { status: ChatMessage["status"]; colors:
   }
 }
 
+function useAnimationPulsation(actif: boolean) {
+  const valeur = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!actif) return;
+    const boucle = Animated.loop(
+      Animated.sequence([
+        Animated.timing(valeur, { toValue: 1, duration: 900, useNativeDriver: true }),
+        Animated.timing(valeur, { toValue: 0, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    boucle.start();
+    return () => boucle.stop();
+  }, [actif, valeur]);
+
+  return valeur;
+}
+
 export default function MessageBubble({ message, isOwnMessage, onMediaPress }: Props) {
   const { colors } = useAppTheme();
 
+  const { commande, contenu } = message.text
+    ? parserCommande(message.text)
+    : { commande: null, contenu: message.text ?? "" };
+  const estImportant = commande === "important";
+
+  const pulsation = useAnimationPulsation(estImportant);
+  const echelle = pulsation.interpolate({ inputRange: [0, 1], outputRange: [1, 1.025] });
+  const lueur = pulsation.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.85] });
+
   return (
     <View style={[styles.container, isOwnMessage ? styles.containerRight : styles.containerLeft]}>
-      <View
+      <Animated.View
         style={[
           styles.bubble,
+          estImportant && styles.bubbleImportant,
           {
             backgroundColor: isOwnMessage ? ROSE.gold : colors.bubbleOther,
             shadowColor: isOwnMessage ? ROSE.goldDeep : "#000",
+            borderColor: estImportant ? ROSE.goldDeep : "transparent",
+            transform: estImportant ? [{ scale: echelle }] : undefined,
           },
           isOwnMessage ? styles.bubbleOwnShape : styles.bubbleOtherShape,
         ]}
       >
+        {estImportant && (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.lueurImportant, { opacity: lueur, borderColor: ROSE.gold }]}
+          />
+        )}
+
+        {estImportant && (
+          <View style={styles.enTeteImportant}>
+            <Ionicons name="sparkles" size={13} color={isOwnMessage ? "#FFFFFF" : ROSE.goldDeep} />
+            <Text style={[styles.labelImportant, { color: isOwnMessage ? "#FFFFFF" : ROSE.goldDeep }]}>
+              IMPORTANT
+            </Text>
+            <Ionicons name="sparkles" size={13} color={isOwnMessage ? "#FFFFFF" : ROSE.goldDeep} />
+          </View>
+        )}
+
         {message.media?.map((m) => {
-          // En liste on affiche la vignette ; le plein écran charge l'original
           const source = m.urlVignette
             ? urlComplete(m.urlVignette)
             : m.url
@@ -112,9 +153,18 @@ export default function MessageBubble({ message, isOwnMessage, onMediaPress }: P
           );
         })}
 
-        {message.text ? (
-          <Text style={[styles.text, { color: isOwnMessage ? "#FFFFFF" : colors.textOther }]}>
-            {renderTexteAvecGras(message.text, [styles.text, { color: isOwnMessage ? "#FFFFFF" : colors.textOther }], isOwnMessage)}
+        {contenu ? (
+          <Text
+            style={[
+              estImportant ? styles.textImportant : styles.text,
+              { color: isOwnMessage ? "#FFFFFF" : colors.textOther },
+            ]}
+          >
+            {renderTexteAvecGras(
+              contenu,
+              estImportant ? styles.textImportant : styles.text,
+              isOwnMessage
+            )}
           </Text>
         ) : null}
 
@@ -128,7 +178,7 @@ export default function MessageBubble({ message, isOwnMessage, onMediaPress }: P
             </View>
           )}
         </View>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -160,6 +210,38 @@ const styles = StyleSheet.create({
   },
   bubbleOtherShape: {
     borderBottomLeftRadius: 6,
+  },
+    bubbleImportant: {
+    borderWidth: 1.5,
+    paddingVertical: 12,
+    overflow: "hidden",
+  },
+  lueurImportant: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 20,
+    borderWidth: 2,
+  },
+  enTeteImportant: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  labelImportant: {
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1.2,
+  },
+  textImportant: {
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: "700",
+    textAlign: "center",
   },
   text: {
     fontSize: 15,
