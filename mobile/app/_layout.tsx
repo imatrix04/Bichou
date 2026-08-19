@@ -37,8 +37,10 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      tsx
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="galerie" options={{ headerShown: false }} />
       </Stack>
     </AuthProvider>
   );

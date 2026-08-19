@@ -10,6 +10,7 @@ import { routeurAuth } from "./routes/auth.js";
 import { routeurMessages } from "./routes/messages.js";
 import { routeurMedias } from "./routes/medias.js";
 import { routeurAppareils } from "./routes/appareils.js";
+import { routeurGalerie } from "./routes/galerie.js";
 
 const app = express();
 app.use(cors());
@@ -19,6 +20,7 @@ app.use("/auth", routeurAuth);
 app.use("/messages", routeurMessages);
 app.use("/medias", routeurMedias);
 app.use("/appareils", routeurAppareils);
+app.use("/galerie", routeurGalerie);
 
 app.get("/health", async (_req, res) => {
   try {

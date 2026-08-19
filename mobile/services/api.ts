@@ -48,6 +48,18 @@ export interface MediaTeleverse {
   hauteur?: number;
 }
 
+export interface PhotoGalerieApi {
+  id: string;
+  url: string;
+  urlVignette?: string;
+  mimeType: string;
+  width?: number;
+  height?: number;
+  ajoutePar: string;
+  ajouteParNom: string;
+  ajouteLe: string;
+}
+
 export class ApiError extends Error {
   constructor(message: string, public statut: number) {
     super(message);
@@ -131,6 +143,73 @@ export async function recupererMessages(
 
   const donnees = await reponse.json();
   return donnees.messages;
+}
+
+export async function recupererGalerie(
+  token: string,
+  avant?: string,
+  limite = 40
+): Promise<PhotoGalerieApi[]> {
+  const url = new URL(`${BASE_URL}/galerie`);
+  if (avant) url.searchParams.set("avant", avant);
+  url.searchParams.set("limite", String(limite));
+
+  const reponse = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!reponse.ok) {
+    throw new ApiError("Impossible de charger la galerie", reponse.status);
+  }
+
+  const donnees = await reponse.json();
+  return donnees.photos;
+}
+
+export async function ajouterPhotoGalerie(
+  token: string,
+  uri: string,
+  mimeType: string
+): Promise<PhotoGalerieApi> {
+  const extension = mimeType.split("/")[1] ?? "jpg";
+
+  if (Platform.OS !== "web") {
+    const resultat = await FileSystem.uploadAsync(`${BASE_URL}/galerie`, uri, {
+      httpMethod: "POST",
+      uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+      fieldName: "fichier",
+      mimeType,
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (resultat.status < 200 || resultat.status >= 300) {
+      let message = "Échec de l'ajout à la galerie";
+      try {
+        message = JSON.parse(resultat.body).erreur ?? message;
+      } catch {}
+      throw new ApiError(message, resultat.status);
+    }
+
+    return JSON.parse(resultat.body);
+  }
+
+  const formData = new FormData();
+  const blobReponse = await fetch(uri);
+  const blob = await blobReponse.blob();
+  formData.append("fichier", blob, `photo.${extension}`);
+
+  const reponse = await fetch(`${BASE_URL}/galerie`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+
+  if (!reponse.ok) {
+    const donnees = await reponse.json().catch(() => ({}));
+    throw new ApiError(donnees.erreur ?? "Échec de l'ajout à la galerie", reponse.status);
+  }
+
+  return reponse.json();
 }
 
 export async function enregistrerAppareil(

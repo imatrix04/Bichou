@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
+import { useRouter } from "expo-router";
 
 import { useAuth } from "../contexts/AuthContext";
 import { useChat } from "../hooks/useChat";
@@ -29,6 +30,7 @@ import { ACCENTS, ACCENT_ACTIF } from "../theme/accents";
 const ROSE = ACCENTS[ACCENT_ACTIF];
 
 export default function ChatScreen() {
+  const router = useRouter();
   const { colors, isDark } = useAppTheme();
   const { utilisateur, seDeconnecter } = useAuth();
   const {
@@ -100,10 +102,10 @@ export default function ChatScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { borderBottomColor: ROSE.gold }]}>
+            <View style={[styles.header, { borderBottomColor: ROSE.gold }]}>
         <View style={styles.headerTitleRow}>
           <Text style={[styles.headerTitle, { color: colors.text }]}>{nomEnTete}</Text>
-                    <Ionicons name="heart" size={14} color={ROSE.gold} style={styles.headerHeart} />
+          <Ionicons name="heart" size={14} color={ROSE.gold} style={styles.headerHeart} />
           {autreEnLigne ? (
             <View style={styles.headerStatusRow}>
               <View style={styles.pointEnLigne} />
@@ -117,9 +119,15 @@ export default function ChatScreen() {
             </Text>
           )}
         </View>
-        <TouchableOpacity onPress={seDeconnecter}>
-          <Ionicons name="log-out-outline" size={22} color={ROSE.goldDeep} />
-        </TouchableOpacity>
+
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => router.push("/galerie")} hitSlop={10}>
+            <Ionicons name="images-outline" size={22} color={ROSE.goldDeep} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={seDeconnecter} hitSlop={10}>
+            <Ionicons name="log-out-outline" size={22} color={ROSE.goldDeep} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -339,6 +347,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     letterSpacing: 0.4,
+  },
+    headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
   },
   headerHeart: {
     marginLeft: 6,

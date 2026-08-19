@@ -36,6 +36,27 @@ export async function pickFromLibrary(): Promise<MediaAttachment | null> {
   return toMediaAttachment(result.assets[0]);
 }
 
+export async function pickMultipleFromLibrary(limite = 20): Promise<MediaAttachment[]> {
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== "granted") {
+    return [];
+  }
+
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ["images"],
+    quality: 0.7,
+    allowsEditing: false,
+    allowsMultipleSelection: true,
+    selectionLimit: limite,
+  });
+
+  if (result.canceled || result.assets.length === 0) {
+    return [];
+  }
+
+  return result.assets.map(toMediaAttachment);
+}
+
 export async function pickFromCamera(): Promise<MediaAttachment | null> {
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
   if (status !== "granted") {
